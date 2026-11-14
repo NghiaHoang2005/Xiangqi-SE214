@@ -1,0 +1,25 @@
+# Labels PRs by changed paths and branch prefix (see .github/workflows/labeler.yml).
+'area: server':
+  - changed-files:
+      - any-glob-to-any-file: apps/server/**
+'area: web':
+  - changed-files:
+      - any-glob-to-any-file: apps/web/**
+'area: rules':
+  - changed-files:
+      - any-glob-to-any-file: packages/rules/**
+'area: shared':
+  - changed-files:
+      - any-glob-to-any-file: packages/shared/**
+'area: infra':
+  - changed-files:
+      - any-glob-to-any-file:
+          - docker-compose.yml
+          - '**/Dockerfile'
+          - .github/**
+'type: feature':
+  - head-branch: ['^feature/']
+'type: chore':
+  - head-branch: ['^chore/']
+'bug':
+  - head-branch: ['^fix/']

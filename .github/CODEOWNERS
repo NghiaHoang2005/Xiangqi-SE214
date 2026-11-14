@@ -1,0 +1,18 @@
+# Reviewers are requested automatically for PRs that touch these paths.
+# Replace <github-...> with each member's real GitHub username and uncomment the line.
+# Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default: the lead reviews
+*                         @NghiaHoang2005
+
+# Backend
+# /apps/server/           <github-xuan-ngoc> <github-phu-phong> <github-vu-dat>
+# Rules Engine & AI: rules owner
+# /packages/rules/        <github-vu-dat>
+# Shared types/events: one BE and one FE approval
+# /packages/shared/       <github-xuan-ngoc> @NghiaHoang2005
+# Frontend
+# /apps/web/              @NghiaHoang2005 <github-minh-anh> <github-minh-quan>
+# Infrastructure
+# /docker-compose.yml     <github-xuan-ngoc>
+# /.github/workflows/     <github-xuan-ngoc>
