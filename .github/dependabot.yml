@@ -1,4 +1,4 @@
-# Mỗi tháng gom bản cập nhật thư viện thành ít PR; bản major để nhóm tự quyết.
+# Monthly, grouped dependency updates; major versions are left for the team to decide.
 version: 2
 updates:
   - package-ecosystem: npm

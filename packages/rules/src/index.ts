@@ -1,14 +1,14 @@
 /**
- * Rules Engine cờ tướng — SRS chương 7 (BR-01..BR-17).
- * Khung ban đầu: chỉ có kích thước bàn và kiểu tọa độ.
- * Biểu diễn bàn cờ + vị trí ban đầu: US-08. Sinh nước: US-09. Chiếu/bí: US-10, US-17.
+ * Xiangqi Rules Engine — SRS chapter 7 (BR-01..BR-17).
+ * Initial skeleton: board size and coordinate types only.
+ * Board model + initial position: US-08. Move generation: US-09. Check/mate: US-10, US-17.
  */
 import type { Side } from '@xiangqi/shared';
 
-export const BOARD_FILES = 9; // cột
-export const BOARD_RANKS = 10; // hàng
+export const BOARD_FILES = 9; // columns
+export const BOARD_RANKS = 10; // rows
 
-/** Giao điểm trên bàn: file 0..8 (trái→phải phía Đỏ), rank 0..9 (từ đáy phía Đỏ). */
+/** Board intersection: file 0..8 (left to right from Red's side), rank 0..9 (from Red's back rank). */
 export interface Square {
   file: number;
   rank: number;

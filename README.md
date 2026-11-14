@@ -56,7 +56,8 @@ Web: http://localhost:8080 · API: http://localhost:3000/api/health
 ## Quy trình làm việc
 
 - Mỗi story Jira một nhánh: `feature/XQ-<số>-<mô-tả-ngắn>`, sửa lỗi dùng `fix/XQ-<số>-...`.
-- Commit có mã Jira ở đầu: `XQ-20: kiểm tra version khi SubmitMove`. Jira sẽ tự hiện commit/PR trong issue nếu đã kết nối GitHub.
+- Commit message, comment trong code, mô tả PR viết bằng **tiếng Anh**. Riêng chữ hiển thị trên giao diện vẫn là tiếng Việt (FR-25).
+- Commit theo [Conventional Commits](https://www.conventionalcommits.org/) và có mã Jira: `feat(server): validate state version on SubmitMove (XQ-20)`. Loại hay dùng: `feat`, `fix`, `chore`, `test`, `docs`, `refactor`. Jira sẽ tự hiện commit/PR trong issue nếu đã kết nối GitHub.
 - Mở PR vào `main`, CI phải xanh và có ít nhất 1 review. Người review tự động theo `.github/CODEOWNERS`.
 - Đổi tên sự kiện, payload hay mã lỗi thì sửa trong `packages/shared` để FE và BE cùng thấy.
 - Không commit `.env` hay bất kỳ secret nào.

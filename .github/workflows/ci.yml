@@ -24,7 +24,7 @@ jobs:
         run: pnpm format:check
       - name: Lint
         run: pnpm lint
-      # Build trước để package chung (shared, rules) có dist cho typecheck của app.
+      # Build first so the shared packages (shared, rules) have dist output for app typechecks.
       - name: Build
         run: pnpm build
       - name: Typecheck

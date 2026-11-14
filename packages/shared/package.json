@@ -2,7 +2,7 @@
   "name": "@xiangqi/shared",
   "version": "0.0.0",
   "private": true,
-  "description": "Type sự kiện Socket.IO, mã lỗi và hằng số baseline dùng chung FE/BE (SRS mục 9.3, 9.4, 14)",
+  "description": "Socket.IO event names, error codes and baseline constants shared by FE and BE (SRS 9.3, 9.4, 14)",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",

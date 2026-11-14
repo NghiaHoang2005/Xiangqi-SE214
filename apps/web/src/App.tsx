@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react';
 import { BOARD_FILES, BOARD_RANKS } from '@xiangqi/rules';
 import { TIME_CONTROL_PRESETS } from '@xiangqi/shared';
 
-/** Trang tạm để kiểm tra FE gọi được BE và dùng được package chung. Thay bằng trang chủ ở US-12. */
+/**
+ * Temporary page that checks the web app can reach the backend and use the shared packages.
+ * Replaced by the home page in US-12. UI text stays Vietnamese (FR-25).
+ */
 export function App() {
   const [server, setServer] = useState('đang kiểm tra…');
 

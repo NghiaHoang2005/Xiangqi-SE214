@@ -8,7 +8,7 @@ async function bootstrap() {
   app.enableShutdownHooks();
   const port = Number(process.env.SERVER_PORT ?? 3000);
   await app.listen(port);
-  console.log(`Server đang chạy tại http://localhost:${port}/api`);
+  console.log(`Server listening on http://localhost:${port}/api`);
 }
 
 void bootstrap();

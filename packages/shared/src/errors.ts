@@ -1,4 +1,4 @@
-/** Mã lỗi tối thiểu theo SRS mục 9.4, cộng các mã nhắc trong use case. */
+/** Minimum error codes from SRS section 9.4, plus codes referenced in the use cases. */
 export const ErrorCode = {
   ROOM_NOT_FOUND: 'ROOM_NOT_FOUND',
   ROOM_EXPIRED: 'ROOM_EXPIRED',

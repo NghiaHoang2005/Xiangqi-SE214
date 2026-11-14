@@ -1,4 +1,4 @@
-# Chạy toàn bộ hệ thống: cp .env.example .env && docker compose up --build
+# Run the whole stack: cp .env.example .env && docker compose up --build
 # Web: http://localhost:${WEB_PORT}  ·  API: http://localhost:${SERVER_PORT}/api/health
 services:
   db:

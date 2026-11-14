@@ -1,4 +1,4 @@
-# Build từ thư mục gốc repo: docker build -f apps/web/Dockerfile .
+# Build from the repo root: docker build -f apps/web/Dockerfile .
 FROM node:22-alpine AS build
 RUN corepack enable
 WORKDIR /repo

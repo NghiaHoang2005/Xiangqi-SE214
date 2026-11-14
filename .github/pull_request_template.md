@@ -2,17 +2,17 @@
 
 XQ-
 
-## Thay đổi
+## Changes
 
 -
 
-## Cách kiểm tra
+## How to test
 
 -
 
 ## Checklist
 
-- [ ] Tên nhánh / tiêu đề PR có mã Jira (vd. `feature/XQ-20-submit-move`)
-- [ ] `pnpm lint`, `pnpm build`, `pnpm typecheck`, `pnpm test` chạy qua
-- [ ] Đã đối chiếu tiêu chí chấp nhận của story
-- [ ] Đổi sự kiện/mã lỗi thì đã cập nhật `packages/shared`
+- [ ] Branch name and PR title include the Jira key (e.g. `feature/XQ-20-submit-move`)
+- [ ] `pnpm lint`, `pnpm build`, `pnpm typecheck` and `pnpm test` pass
+- [ ] Checked against the story's acceptance criteria
+- [ ] Updated `packages/shared` if events or error codes changed

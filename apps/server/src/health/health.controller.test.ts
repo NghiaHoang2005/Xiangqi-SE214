@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { HealthController } from './health.controller';
 
 describe('HealthController', () => {
-  it('trả status ok', async () => {
+  it('returns status ok', async () => {
     const moduleRef = await Test.createTestingModule({ controllers: [HealthController] }).compile();
     const controller = moduleRef.get(HealthController);
     expect(controller.health().status).toBe('ok');

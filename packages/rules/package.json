@@ -2,7 +2,7 @@
   "name": "@xiangqi/rules",
   "version": "0.0.0",
   "private": true,
-  "description": "Rules Engine cờ tướng dùng chung server (kiểm tra nước) và client (gợi ý nước) — SRS chương 7",
+  "description": "Xiangqi Rules Engine shared by the server (move validation) and the client (move hints) — SRS chapter 7",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",

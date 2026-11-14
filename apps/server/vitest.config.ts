@@ -1,7 +1,7 @@
 import swc from 'unplugin-swc';
 import { defineConfig } from 'vitest/config';
 
-// SWC để vitest hiểu decorator metadata của NestJS.
+// SWC lets Vitest handle NestJS decorator metadata.
 export default defineConfig({
   plugins: [swc.vite()],
   test: { include: ['src/**/*.test.ts'] },
