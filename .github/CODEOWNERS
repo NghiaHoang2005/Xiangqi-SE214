@@ -1,0 +1,18 @@
+# PR đụng vào đường dẫn nào sẽ tự động yêu cầu review từ người tương ứng.
+# Thay <github-...> bằng username GitHub thật của từng người rồi bỏ dấu # ở đầu dòng.
+# Xem thêm: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Mặc định: lead review
+*                         @NghiaHoang2005
+
+# Backend
+# /apps/server/           <github-xuan-ngoc> <github-phu-phong> <github-vu-dat>
+# Rules Engine & AI: người phụ trách luật
+# /packages/rules/        <github-vu-dat>
+# Type/sự kiện dùng chung: cần cả 1 BE và 1 FE đồng ý
+# /packages/shared/       <github-xuan-ngoc> @NghiaHoang2005
+# Frontend
+# /apps/web/              @NghiaHoang2005 <github-minh-anh> <github-minh-quan>
+# Hạ tầng
+# /docker-compose.yml     <github-xuan-ngoc>
+# /.github/workflows/     <github-xuan-ngoc>

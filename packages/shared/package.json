@@ -1,0 +1,29 @@
+{
+  "name": "@xiangqi/shared",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Type sự kiện Socket.IO, mã lỗi và hằng số baseline dùng chung FE/BE (SRS mục 9.3, 9.4, 14)",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
+  },
+  "devDependencies": {
+    "tsup": "8.3.5",
+    "typescript": "5.7.2",
+    "vitest": "2.1.8"
+  }
+}

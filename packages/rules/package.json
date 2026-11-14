@@ -1,0 +1,34 @@
+{
+  "name": "@xiangqi/rules",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Rules Engine cờ tướng dùng chung server (kiểm tra nước) và client (gợi ý nước) — SRS chương 7",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "tsup": "8.3.5",
+    "typescript": "5.7.2",
+    "vitest": "2.1.8",
+    "@vitest/coverage-v8": "2.1.8"
+  },
+  "dependencies": {
+    "@xiangqi/shared": "workspace:*"
+  }
+}
