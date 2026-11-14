@@ -55,7 +55,9 @@ Web: http://localhost:8080 · API: http://localhost:3000/api/health
 
 ## Workflow
 
-- One branch per Jira story: `feature/SCRUM-<number>-<short-description>`; bug fixes use `fix/SCRUM-<number>-...`. Use the Jira issue key of the **story** (e.g. `SCRUM-62`), not the `US-xx` label in its title.
+- One branch per Jira **sub-task**, named with that sub-task's key: `feature/SCRUM-<number>-<short-description>`; bug fixes use `fix/SCRUM-<number>-...`. Use the Jira key (e.g. `SCRUM-133`), not the `US-xx` label in the story title. Put the same key in the PR title.
+- Jira moves the issue automatically: branch created → **In Progress**, PR opened → **In Review**, PR merged into `main` → **Done**. When every sub-task of a story is Done, the story moves to Done; when every story of an epic is Done, the epic moves to Done.
+- Use the **story** key only for work that has no sub-task. Do not put a story key on a PR that finishes just one sub-task: merging it would close the whole story.
 - Write commit messages, code comments and PR descriptions in **English**. Text shown in the UI stays in Vietnamese (FR-25).
 - Follow [Conventional Commits](https://www.conventionalcommits.org/) and include the Jira key: `feat(server): validate state version on SubmitMove (SCRUM-<number>)`. Common types: `feat`, `fix`, `chore`, `test`, `docs`, `refactor`. Once Jira is connected to GitHub, commits and PRs show up on the matching issue.
 - Open PRs against `main`. CI must pass and at least one review is required. Reviewers are requested automatically from `.github/CODEOWNERS`.
