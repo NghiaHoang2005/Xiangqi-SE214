@@ -57,7 +57,7 @@ Web: http://localhost:8080 · API: http://localhost:3000/api/health
 
 - One branch per Jira story: `feature/SCRUM-<number>-<short-description>`; bug fixes use `fix/SCRUM-<number>-...`. Use the Jira issue key of the **story** (e.g. `SCRUM-62`), not the `US-xx` label in its title.
 - Write commit messages, code comments and PR descriptions in **English**. Text shown in the UI stays in Vietnamese (FR-25).
-- Follow [Conventional Commits](https://www.conventionalcommits.org/) and include the Jira key: `feat(server): validate state version on SubmitMove (SCRUM-81)`. Common types: `feat`, `fix`, `chore`, `test`, `docs`, `refactor`. Once Jira is connected to GitHub, commits and PRs show up on the matching issue.
+- Follow [Conventional Commits](https://www.conventionalcommits.org/) and include the Jira key: `feat(server): validate state version on SubmitMove (SCRUM-<number>)`. Common types: `feat`, `fix`, `chore`, `test`, `docs`, `refactor`. Once Jira is connected to GitHub, commits and PRs show up on the matching issue.
 - Open PRs against `main`. CI must pass and at least one review is required. Reviewers are requested automatically from `.github/CODEOWNERS`.
 - When you rename an event, change a payload or add an error code, update `packages/shared` so FE and BE stay in sync.
 - Never commit `.env` or any other secret.
