@@ -2,6 +2,9 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { configureApp } from './bootstrap';
+import { loadDotEnv } from './env';
+
+loadDotEnv();
 
 async function bootstrap() {
   const app = configureApp(await NestFactory.create(AppModule));

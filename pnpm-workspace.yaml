@@ -6,3 +6,6 @@ onlyBuiltDependencies:
   - '@nestjs/core'
   - '@swc/core'
   - esbuild
+  - prisma
+  - '@prisma/client'
+  - '@prisma/engines'
