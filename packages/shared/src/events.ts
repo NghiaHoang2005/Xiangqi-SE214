@@ -28,3 +28,22 @@ export const ServerEvent = {
 
 export type ClientEvent = (typeof ClientEvent)[keyof typeof ClientEvent];
 export type ServerEvent = (typeof ServerEvent)[keyof typeof ServerEvent];
+
+/** Socket.IO acknowledgement returned by every client → server event handler. */
+export type Ack<T> =
+  | { ok: true; requestId: string; data: T }
+  | { ok: false; requestId: string; error: import('./errors').ApiError };
+
+/** Every client → server payload may carry a requestId so logs and errors can be correlated. */
+export interface RequestEnvelope {
+  requestId?: string;
+}
+
+/** Connectivity check used by the client socket wrapper and tests. */
+export const SystemEvent = {
+  Ping: 'Ping',
+} as const;
+
+export interface PingResult {
+  serverTime: number;
+}

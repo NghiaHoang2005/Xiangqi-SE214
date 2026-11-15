@@ -11,6 +11,11 @@ export const ErrorCode = {
   AI_UNAVAILABLE: 'AI_UNAVAILABLE',
   ACCESS_DENIED: 'ACCESS_DENIED',
   QUEUE_ALREADY_ACTIVE: 'QUEUE_ALREADY_ACTIVE',
+  // Generic codes for failures that are not tied to one use case.
+  VALIDATION_FAILED: 'VALIDATION_FAILED',
+  NOT_FOUND: 'NOT_FOUND',
+  RATE_LIMITED: 'RATE_LIMITED',
+  INTERNAL_ERROR: 'INTERNAL_ERROR',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
