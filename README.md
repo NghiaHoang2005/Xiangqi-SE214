@@ -54,7 +54,7 @@ Web: http://localhost:8080 · API: http://localhost:3000/api/health
 | `pnpm test`                                  | Run tests (Vitest)                          |
 | `pnpm --filter @xiangqi/rules test:coverage` | Rules Engine coverage (target ≥80%, NFR-14) |
 
-Database commands (`apps/server`, run `pnpm build` first): `pnpm db:migrate`, `pnpm db:revert`, and `pnpm db:generate src/database/migrations/<Name>` after changing an entity. See [docs/database.md](docs/database.md) for the schema and rules.
+Database commands (Prisma, in `apps/server`): `pnpm db:migrate` applies migrations, `pnpm db:migrate:dev --name <change>` creates one after editing `prisma/schema.prisma`, `pnpm db:status` and `pnpm db:studio` inspect the database. See [docs/database.md](docs/database.md) for the schema and rules.
 
 Server tests that need PostgreSQL read `TEST_DATABASE_URL` and **wipe that database**. Without it they are skipped; CI always runs them.
 

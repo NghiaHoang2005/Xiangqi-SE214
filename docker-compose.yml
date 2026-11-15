@@ -28,7 +28,6 @@ services:
     environment:
       SERVER_PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-      DB_MIGRATIONS_RUN: 'true'
     ports:
       - '${SERVER_PORT:-3000}:3000'
     depends_on:

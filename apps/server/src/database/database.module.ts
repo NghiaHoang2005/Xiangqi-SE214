@@ -1,12 +1,7 @@
-import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { dataSourceOptions } from './options';
+import { Global, Module } from '@nestjs/common';
+import { PrismaService } from './prisma.service';
 
-/**
- * PostgreSQL connection (CFG-09). Feature modules register the repositories they need with
- * `TypeOrmModule.forFeature([Room, RoomSeat])`.
- */
-@Module({
-  imports: [TypeOrmModule.forRootAsync({ useFactory: () => dataSourceOptions() })],
-})
+/** PostgreSQL access for every feature module; imported once in AppModule. */
+@Global()
+@Module({ providers: [PrismaService], exports: [PrismaService] })
 export class DatabaseModule {}

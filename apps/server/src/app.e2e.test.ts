@@ -13,7 +13,7 @@ describe.skipIf(!hasTestDb)('server skeleton (e2e)', () => {
   let baseUrl: string;
 
   beforeAll(async () => {
-    await (await resetTestDatabase()).destroy();
+    await (await resetTestDatabase()).$disconnect();
     process.env.DATABASE_URL = TEST_DATABASE_URL;
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = configureApp(moduleRef.createNestApplication());

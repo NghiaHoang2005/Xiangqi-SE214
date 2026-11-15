@@ -1,7 +1,21 @@
 # Database
 
-PostgreSQL 16, accessed through TypeORM from `apps/server/src/database`. Tables follow SRS 8.2.
-The schema changes only through migrations (`synchronize` is off).
+PostgreSQL 16, accessed through [Prisma](https://www.prisma.io/docs) from `apps/server`.
+The schema lives in `apps/server/prisma/schema.prisma`; tables follow SRS 8.2. The database
+changes only through the SQL migrations in `apps/server/prisma/migrations`.
+
+In a service, inject `PrismaService` (available everywhere through `DatabaseModule`):
+
+```ts
+constructor(private readonly db: PrismaService) {}
+
+findRoom(joinCode: string) {
+  return this.db.room.findUnique({ where: { joinCode }, include: { seats: true } });
+}
+```
+
+Prisma reports a broken unique rule as error code `P2002`; map it to the matching `DomainException`
+(for example `ROOM_FULL` when a seat insert collides).
 
 ## Entity relationship diagram
 
@@ -70,14 +84,14 @@ erDiagram
 
 ## Rules enforced by the database
 
-| Rule                                        | How                          | SRS   |
-| ------------------------------------------- | ---------------------------- | ----- |
-| A room has at most two seats, one per side  | PK `(room_id, side)`         | FR-04 |
-| One guest cannot take both seats            | unique `(room_id, guest_id)` | FR-04 |
-| A ply is committed once per match           | PK `(match_id, ply)`         | 8.3   |
-| A retried `SubmitMove` cannot commit twice  | unique `(match_id, move_id)` | 3.3   |
-| PVE matches name the AI side and difficulty | check `chk_match_pve_has_ai` | FR-30 |
-| Deleting a match deletes its moves          | FK `ON DELETE CASCADE`       | BR-20 |
+| Rule                                        | How                                                           | SRS   |
+| ------------------------------------------- | ------------------------------------------------------------- | ----- |
+| A room has at most two seats, one per side  | PK `(room_id, side)`                                          | FR-04 |
+| One guest cannot take both seats            | unique `(room_id, guest_id)`                                  | FR-04 |
+| A ply is committed once per match           | PK `(match_id, ply)`                                          | 8.3   |
+| A retried `SubmitMove` cannot commit twice  | unique `(match_id, move_id)`                                  | 3.3   |
+| PVE matches name the AI side and difficulty | check `chk_match_pve_has_ai` (added by hand in the migration) | FR-30 |
+| Deleting a match deletes its moves          | FK `ON DELETE CASCADE`                                        | BR-20 |
 
 ## Not in this schema yet
 
@@ -88,10 +102,12 @@ erDiagram
 
 ## Changing the schema
 
-1. Edit or add an entity in `apps/server/src/database/entities` (and add new ones to `ENTITIES`).
-2. `pnpm build`, then in `apps/server`: `pnpm db:generate src/database/migrations/<Name>`.
-3. Read the generated SQL. TypeORM creates a shared enum type once per column that uses it
-   (for example `side`); delete the duplicate `CREATE TYPE` and keep the matching `DROP TYPE`
-   only after the last table that uses it.
-4. Use `import type { MigrationInterface, QueryRunner }` at the top of the migration.
-5. `pnpm db:migrate`, `pnpm db:revert`, `pnpm db:migrate` to check both directions, then commit.
+1. Edit `apps/server/prisma/schema.prisma`.
+2. In `apps/server`: `pnpm db:migrate:dev --name <what-changed>`. This writes a new folder under
+   `prisma/migrations`, applies it to your local database and regenerates the client.
+3. Read the generated `migration.sql`. Rules Prisma cannot express (check constraints such as
+   `chk_match_pve_has_ai`) are written by hand in SQL; use `--create-only` first if you need to add
+   some before applying.
+4. Never edit a migration that is already on `main`; add a new one instead.
+5. Commit `schema.prisma` and the new migration folder together. Docker and CI run
+   `prisma migrate deploy`, which only applies committed migrations.
