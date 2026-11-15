@@ -1,0 +1,213 @@
+// Database schema for SRS 8.2. Change it here, then create a migration:
+//   pnpm db:migrate:dev --name <what-changed>
+// See docs/database.md.
+
+generator client {
+  provider      = "prisma-client-js"
+  // native: dev machines and CI; linux-musl: the node:22-alpine Docker image.
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Side {
+  RED
+  BLACK
+
+  @@map("side")
+}
+
+enum SidePreference {
+  RED
+  BLACK
+  RANDOM
+
+  @@map("side_preference")
+}
+
+enum RoomStatus {
+  WAITING
+  STARTED
+  CLOSED
+  EXPIRED
+
+  @@map("room_status")
+}
+
+enum ConnectionState {
+  CONNECTED
+  RECONNECTING
+  DISCONNECTED
+
+  @@map("connection_state")
+}
+
+enum GameMode {
+  PVP
+  PVE
+  PVP_RANKED
+
+  @@map("game_mode")
+}
+
+enum AiDifficulty {
+  EASY
+  MEDIUM
+  HARD
+
+  @@map("ai_difficulty")
+}
+
+enum MatchStatus {
+  IN_PROGRESS
+  FINISHED
+
+  @@map("match_status")
+}
+
+enum EndReason {
+  CHECKMATE
+  STALEMATE
+  RESIGN
+  DRAW_AGREEMENT
+  TIMEOUT
+  DISCONNECT_FORFEIT
+
+  @@map("end_reason")
+}
+
+enum ActorType {
+  HUMAN
+  AI
+
+  @@map("actor_type")
+}
+
+/// Temporary player identity (UC-01, FR-01). Only the SHA-256 of the 256-bit reconnect
+/// token is stored (NFR-08, NFR-10). Expires after 30 days of inactivity (CFG-07).
+model GuestSession {
+  guestId            String   @id @default(uuid()) @map("guest_id") @db.Uuid
+  nickname           String?  @db.VarChar(32)
+  reconnectTokenHash String   @unique @map("reconnect_token_hash") @db.Char(64)
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastSeenAt         DateTime @map("last_seen_at") @db.Timestamptz(3)
+  expiresAt          DateTime @map("expires_at") @db.Timestamptz(3)
+
+  hostedRooms  Room[]
+  seats        RoomSeat[]
+  matchesRed   Match[]    @relation("MatchRed")
+  matchesBlack Match[]    @relation("MatchBlack")
+
+  @@index([expiresAt])
+  @@map("guest_session")
+}
+
+/// Private PVP waiting room (UC-03, UC-04). roomId has at least 128 bits of entropy (NFR-10);
+/// joinCode is the 8-character code players type (CFG-06). Closes after 30 idle minutes.
+model Room {
+  roomId         String         @id @map("room_id") @db.VarChar(43)
+  joinCode       String         @unique @map("join_code") @db.Char(8)
+  status         RoomStatus     @default(WAITING)
+  /// { initialMinutes: 5 | 10 | 15, incrementSeconds: 0 | 5 } (CFG-05)
+  timeControl    Json           @map("time_control")
+  preferredSide  SidePreference @map("preferred_side")
+  hostGuestId    String         @map("host_guest_id") @db.Uuid
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastActivityAt DateTime       @map("last_activity_at") @db.Timestamptz(3)
+  expiresAt      DateTime       @map("expires_at") @db.Timestamptz(3)
+
+  host    GuestSession @relation(fields: [hostGuestId], references: [guestId], onDelete: Cascade)
+  seats   RoomSeat[]
+  matches Match[]
+
+  @@index([expiresAt])
+  @@map("room")
+}
+
+/// One of the two seats of a room (FR-04). The key (room, side) makes a third seat impossible;
+/// (room, guest) stops one guest taking both seats.
+model RoomSeat {
+  roomId          String          @map("room_id") @db.VarChar(43)
+  side            Side
+  guestId         String          @map("guest_id") @db.Uuid
+  joinedAt        DateTime        @default(now()) @map("joined_at") @db.Timestamptz(3)
+  connectionState ConnectionState @default(CONNECTED) @map("connection_state")
+  /// When the seat dropped; the 10-minute reconnect grace runs from here (CFG-08).
+  disconnectedAt  DateTime?       @map("disconnected_at") @db.Timestamptz(3)
+
+  room  Room         @relation(fields: [roomId], references: [roomId], onDelete: Cascade)
+  guest GuestSession @relation(fields: [guestId], references: [guestId], onDelete: Cascade)
+
+  @@id([roomId, side])
+  @@unique([roomId, guestId], map: "uq_room_seat_guest")
+  @@map("room_seat")
+}
+
+/// A PVP, PVE or ranked game (SRS 3.4). The server is the source of truth: `version` grows on
+/// every committed change and `snapshot` is the board at that version.
+/// PVP: a room and two guests. PVE: no room, one guest and an AI side
+/// (enforced by the check constraint chk_match_pve_has_ai in the migration).
+model Match {
+  matchId      String        @id @default(uuid()) @map("match_id") @db.Uuid
+  mode         GameMode
+  roomId       String?       @map("room_id") @db.VarChar(43)
+  redGuestId   String?       @map("red_guest_id") @db.Uuid
+  blackGuestId String?       @map("black_guest_id") @db.Uuid
+  aiSide       Side?         @map("ai_side")
+  aiDifficulty AiDifficulty? @map("ai_difficulty")
+  status       MatchStatus   @default(IN_PROGRESS)
+  timeControl  Json          @map("time_control")
+  turn         Side          @default(RED)
+  version      Int           @default(0)
+  /// Board at `version`; format defined by @xiangqi/rules (US-08).
+  snapshot     Json
+  /// { redMs, blackMs, turnStartedAt } from the server clock (FR-13).
+  clocks       Json
+  /// Null while in progress or on a draw.
+  winner       Side?
+  endReason    EndReason?    @map("end_reason")
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  /// Used by the 30-day retention job (BR-20).
+  endedAt      DateTime?     @map("ended_at") @db.Timestamptz(3)
+
+  room       Room?         @relation(fields: [roomId], references: [roomId], onDelete: SetNull)
+  redGuest   GuestSession? @relation("MatchRed", fields: [redGuestId], references: [guestId], onDelete: SetNull)
+  blackGuest GuestSession? @relation("MatchBlack", fields: [blackGuestId], references: [guestId], onDelete: SetNull)
+  moves      Move[]
+
+  @@index([redGuestId])
+  @@index([blackGuestId])
+  @@index([endedAt])
+  @@map("match")
+}
+
+/// A committed move (FR-10, FR-22). Rejected moves are never stored.
+/// (match, ply) is the key, so plies cannot repeat; (match, moveId) is unique, so a client
+/// retry with the same moveId cannot commit twice (SRS 3.3).
+model Move {
+  matchId    String    @map("match_id") @db.Uuid
+  ply        Int
+  /// Client-generated idempotency key (AI moves get a server-generated one).
+  moveId     String    @map("move_id") @db.Uuid
+  actorType  ActorType @map("actor_type")
+  /// Null for AI moves.
+  guestId    String?   @map("guest_id") @db.Uuid
+  /// { file, rank }, same shape as @xiangqi/rules Square.
+  fromSquare Json      @map("from_square")
+  toSquare   Json      @map("to_square")
+  /// Captured piece, if any (BR-10).
+  capture    Json?
+  clockAfter Json      @map("clock_after")
+  /// Hash of the board after the move, used to check both clients converge (NFR-06).
+  stateHash  String    @map("state_hash") @db.Char(64)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  match Match @relation(fields: [matchId], references: [matchId], onDelete: Cascade)
+
+  @@id([matchId, ply])
+  @@unique([matchId, moveId], map: "uq_move_match_move_id")
+  @@map("move")
+}
