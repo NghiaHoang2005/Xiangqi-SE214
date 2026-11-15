@@ -4,11 +4,17 @@
   "private": true,
   "description": "NestJS + Socket.IO backend — the authoritative source of game state (SRS 3.3)",
   "scripts": {
+    "postinstall": "prisma generate",
+    "build": "prisma generate && nest build",
     "dev": "nest start --watch",
-    "build": "nest build",
     "start": "node dist/main.js",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "typecheck": "prisma generate && tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "db:generate": "prisma generate",
+    "db:migrate": "node scripts/prisma.mjs migrate deploy",
+    "db:migrate:dev": "node scripts/prisma.mjs migrate dev",
+    "db:status": "node scripts/prisma.mjs migrate status",
+    "db:studio": "node scripts/prisma.mjs studio"
   },
   "dependencies": {
     "@nestjs/common": "10.4.15",
@@ -16,8 +22,10 @@
     "@nestjs/platform-express": "10.4.15",
     "@nestjs/platform-socket.io": "10.4.15",
     "@nestjs/websockets": "10.4.15",
+    "@prisma/client": "6.1.0",
     "@xiangqi/rules": "workspace:*",
     "@xiangqi/shared": "workspace:*",
+    "prisma": "6.1.0",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.1",
     "socket.io": "4.8.1"

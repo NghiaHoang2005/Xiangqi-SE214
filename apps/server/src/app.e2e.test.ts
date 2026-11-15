@@ -6,12 +6,15 @@ import { io, type Socket } from 'socket.io-client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from './app.module';
 import { configureApp } from './bootstrap';
+import { TEST_DATABASE_URL, hasTestDb, resetTestDatabase } from './test/test-db';
 
-describe('server skeleton (e2e)', () => {
+describe.skipIf(!hasTestDb)('server skeleton (e2e)', () => {
   let app: INestApplication;
   let baseUrl: string;
 
   beforeAll(async () => {
+    await (await resetTestDatabase()).$disconnect();
+    process.env.DATABASE_URL = TEST_DATABASE_URL;
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = configureApp(moduleRef.createNestApplication());
     app.useLogger(false);
@@ -21,7 +24,7 @@ describe('server skeleton (e2e)', () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    await app?.close();
   });
 
   it('answers /api/health and returns a request id header', async () => {
