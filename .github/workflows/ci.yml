@@ -12,6 +12,19 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: xiangqi
+          POSTGRES_PASSWORD: xiangqi
+          POSTGRES_DB: xiangqi_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U xiangqi" --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://xiangqi:xiangqi@localhost:5432/xiangqi_test
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

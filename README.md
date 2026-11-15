@@ -27,7 +27,8 @@ docker-compose.yml   PostgreSQL + server + web
 pnpm install
 pnpm build                 # build packages/shared and packages/rules the first time
 cp .env.example .env
-docker compose up -d db    # start PostgreSQL only
+docker compose up -d db    # start PostgreSQL only (also creates the xiangqi_test database)
+pnpm --filter @xiangqi/server db:migrate   # create or update the tables
 pnpm dev                   # server on :3000, web on :5173 (web proxies /api and /socket.io to the server)
 ```
 
@@ -52,6 +53,10 @@ Web: http://localhost:8080 · API: http://localhost:3000/api/health
 | `pnpm typecheck`                             | Type-check (run `pnpm build` first)         |
 | `pnpm test`                                  | Run tests (Vitest)                          |
 | `pnpm --filter @xiangqi/rules test:coverage` | Rules Engine coverage (target ≥80%, NFR-14) |
+
+Database commands (`apps/server`, run `pnpm build` first): `pnpm db:migrate`, `pnpm db:revert`, and `pnpm db:generate src/database/migrations/<Name>` after changing an entity. See [docs/database.md](docs/database.md) for the schema and rules.
+
+Server tests that need PostgreSQL read `TEST_DATABASE_URL` and **wipe that database**. Without it they are skipped; CI always runs them.
 
 ## Workflow
 
