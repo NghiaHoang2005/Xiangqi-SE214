@@ -539,3 +539,128 @@ a:focus-visible {
 .toast-info {
   border-left: 4px solid #1a73e8;
 }
+
+/* ─── Home page (SCRUM-141) ─────────────────────────────── */
+.home-page {
+  max-width: 640px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.home-title {
+  font-size: 28px;
+  font-weight: 800;
+  margin: var(--space-6) 0 var(--space-2);
+  color: var(--fg);
+}
+
+.home-subtitle {
+  font-size: 15px;
+  color: var(--muted);
+  margin: 0 0 var(--space-6);
+}
+
+/* Service-unavailable banner (E2) */
+.home-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-6);
+}
+
+.home-banner-text {
+  margin: 0;
+  font-size: 14px;
+  color: var(--danger);
+}
+
+/* Mode cards */
+.home-modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.mode-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+  background: var(--surface);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  font-family: inherit;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s,
+    background 0.15s;
+}
+
+.mode-card:hover:not(:disabled) {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+
+.mode-card:active:not(:disabled) {
+  background: #faf5f5;
+}
+
+.mode-card:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.mode-icon {
+  font-size: 36px;
+  line-height: 1;
+}
+
+.mode-label {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--fg);
+}
+
+.mode-desc {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+/* Quick-join form */
+.home-join {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-end;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.home-join .input-root {
+  flex: 1;
+  text-align: left;
+}
+
+/* Responsive: stack on mobile (NFR-04: 360px) */
+@media (max-width: 480px) {
+  .home-modes {
+    grid-template-columns: 1fr;
+  }
+
+  .home-join {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .home-title {
+    font-size: 22px;
+  }
+}
