@@ -36,7 +36,7 @@ function renderHome() {
 }
 
 /** Set connection status in the store. */
-function setStatus(status: 'idle' | 'connected' | 'disconnected' | 'reconnecting') {
+function setStatus(status: 'idle' | 'connecting' | 'connected' | 'disconnected' | 'reconnecting') {
   useConnectionStore.getState().setStatus(status);
 }
 
@@ -138,6 +138,16 @@ describe('HomePage', () => {
     setStatus('reconnecting');
     renderHome();
     expect(screen.getByText('Đang kết nối lại…')).toBeTruthy();
+  });
+
+  it('shows connecting state and loading spinner on retry button when connecting', () => {
+    setStatus('connecting');
+    renderHome();
+    expect(screen.getByText('Đang kết nối đến máy chủ…')).toBeTruthy();
+    expect(screen.getByText('Vui lòng chờ trong giây lát…')).toBeTruthy();
+    const retryBtn = screen.getByText('Thử lại').closest('button') as HTMLButtonElement;
+    expect(retryBtn.disabled).toBe(true);
+    expect(retryBtn.className).toContain('btn-loading');
   });
 
   it('disables mode cards when offline', () => {

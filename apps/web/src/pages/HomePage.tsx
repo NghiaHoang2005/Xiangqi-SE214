@@ -32,7 +32,8 @@ export function HomePage() {
   const [codeError, setCodeError] = useState('');
   const [joining, setJoining] = useState(false);
 
-  const isOffline = status === 'disconnected' || status === 'reconnecting';
+  const isConnecting = status === 'connecting';
+  const isOffline = status === 'disconnected' || status === 'reconnecting' || isConnecting;
 
   /* ── Room-code form ────────────────────────────────────── */
   function handleJoin(e: FormEvent) {
@@ -60,13 +61,27 @@ export function HomePage() {
       <p className="home-subtitle">Chơi cờ tướng trực tuyến với bạn bè hoặc đấu với máy.</p>
 
       {/* ── Service-unavailable banner (E2) ─────────────── */}
-      {isOffline && (
+      {isOffline && status !== 'connected' && (
         <div className="home-banner" role="alert">
-          <Badge variant="danger">
-            {status === 'reconnecting' ? 'Đang kết nối lại…' : 'Mất kết nối đến máy chủ'}
+          <Badge variant={status === 'connecting' ? 'warning' : 'danger'}>
+            {status === 'connecting'
+              ? 'Đang kết nối đến máy chủ…'
+              : status === 'reconnecting'
+                ? 'Đang kết nối lại…'
+                : 'Mất kết nối đến máy chủ'}
           </Badge>
-          <p className="home-banner-text">Dịch vụ hiện không khả dụng. Vui lòng thử lại.</p>
-          <Button variant="secondary" size="sm" onClick={() => connectSocket()}>
+          <p className="home-banner-text">
+            {status === 'connecting'
+              ? 'Vui lòng chờ trong giây lát…'
+              : 'Dịch vụ hiện không khả dụng. Vui lòng thử lại.'}
+          </p>
+          <Button
+            variant="secondary"
+            size="sm"
+            loading={isConnecting}
+            disabled={isConnecting}
+            onClick={() => connectSocket()}
+          >
             Thử lại
           </Button>
         </div>
