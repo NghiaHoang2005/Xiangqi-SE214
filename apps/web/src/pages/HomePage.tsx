@@ -61,31 +61,36 @@ export function HomePage() {
       <p className="home-subtitle">Chơi cờ tướng trực tuyến với bạn bè hoặc đấu với máy.</p>
 
       {/* ── Service-unavailable banner (E2) ─────────────── */}
-      {isOffline && status !== 'connected' && (
-        <div className="home-banner" role="alert">
-          <Badge variant={status === 'connecting' ? 'warning' : 'danger'}>
-            {status === 'connecting'
-              ? 'Đang kết nối đến máy chủ…'
-              : status === 'reconnecting'
-                ? 'Đang kết nối lại…'
-                : 'Mất kết nối đến máy chủ'}
-          </Badge>
-          <p className="home-banner-text">
-            {status === 'connecting'
-              ? 'Vui lòng chờ trong giây lát…'
-              : 'Dịch vụ hiện không khả dụng. Vui lòng thử lại.'}
-          </p>
-          <Button
-            variant="secondary"
-            size="sm"
-            loading={isConnecting}
-            disabled={isConnecting}
-            onClick={() => connectSocket()}
+      <div className="home-banner-region" aria-live="polite">
+        {isOffline && (
+          <div
+            className={`home-banner ${status === 'disconnected' ? 'home-banner-danger' : 'home-banner-warning'}`}
+            role="alert"
           >
-            Thử lại
-          </Button>
-        </div>
-      )}
+            <Badge variant={status === 'disconnected' ? 'danger' : 'warning'}>
+              {status === 'connecting'
+                ? 'Đang kết nối đến máy chủ…'
+                : status === 'reconnecting'
+                  ? 'Đang kết nối lại…'
+                  : 'Mất kết nối đến máy chủ'}
+            </Badge>
+            <p className="home-banner-text">
+              {status === 'connecting'
+                ? 'Vui lòng chờ trong giây lát…'
+                : 'Dịch vụ hiện không khả dụng. Vui lòng thử lại.'}
+            </p>
+            <Button
+              variant="secondary"
+              size="sm"
+              loading={isConnecting}
+              disabled={isConnecting}
+              onClick={() => connectSocket()}
+            >
+              Thử lại
+            </Button>
+          </div>
+        )}
+      </div>
 
       {/* ── Mode cards ─────────────────────────────────── */}
       <div className="home-modes">
@@ -122,7 +127,6 @@ export function HomePage() {
           label="Vào phòng bằng mã"
           placeholder="VD: ABCD1234"
           value={roomCode}
-          maxLength={8}
           autoComplete="off"
           error={codeError}
           onChange={(e) => {

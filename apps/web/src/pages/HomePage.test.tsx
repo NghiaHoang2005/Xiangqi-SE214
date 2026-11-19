@@ -113,6 +113,14 @@ describe('HomePage', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/room/ABCD1234');
   });
 
+  it('normalises pasted room code with leading and trailing whitespace', () => {
+    renderHome();
+    const input = screen.getByLabelText('Vào phòng bằng mã') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '   abcd1234   ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Vào phòng' }));
+    expect(mockNavigate).toHaveBeenCalledWith('/room/ABCD1234');
+  });
+
   it('clears the error when the user starts typing again', () => {
     renderHome();
     // Trigger an error first
@@ -134,10 +142,13 @@ describe('HomePage', () => {
     expect(screen.getByText('Thử lại')).toBeTruthy();
   });
 
-  it('shows reconnecting text when reconnecting', () => {
+  it('shows reconnecting text with warning badge when reconnecting', () => {
     setStatus('reconnecting');
     renderHome();
-    expect(screen.getByText('Đang kết nối lại…')).toBeTruthy();
+    const badgeText = screen.getByText('Đang kết nối lại…');
+    expect(badgeText).toBeTruthy();
+    const badgeEl = badgeText.closest('.badge');
+    expect(badgeEl?.className).toContain('badge-warning');
   });
 
   it('shows connecting state and loading spinner on retry button when connecting', () => {
