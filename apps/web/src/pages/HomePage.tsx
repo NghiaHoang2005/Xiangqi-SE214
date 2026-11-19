@@ -20,9 +20,10 @@ function normaliseCode(raw: string): string {
  * Home page — UC-02 (FR-27, SRS 9.1).
  *
  * Two clear mode choices + room-code quick-join.
- * Shows a service-unavailable banner when the socket is down (E2),
- * and will redirect to UC-01 on session expiry (E1) once the auth
- * module is implemented on the server.
+ * Shows a service-unavailable banner when the socket is down (E2).
+ * When session expires (E1), UC-01 (guest session creation) will be re-run silently
+ * in the background while keeping the user on the home page once the auth
+ * module is implemented on the server (US-11 / SCRUM-72).
  */
 export function HomePage() {
   const status = useConnectionStore((s) => s.status);
