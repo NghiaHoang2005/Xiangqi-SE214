@@ -1,11 +1,16 @@
 /**
  * Toast system — US-07, SCRUM-129.
  * Usage:
- *   const { show } = useToast();
- *   show({ title: 'Thành công', message: 'Đã sao chép link phòng.', variant: 'success' });
+ *   Wrap your application root with <ToastProvider> (e.g. in main.tsx or AppLayout).
+ *   Then in any component:
+ *     const { show } = useToast();
+ *     show({ title: 'Thành công', message: 'Đã sao chép link phòng.', variant: 'success' });
  *
- * Render <ToastRegion /> once inside <App /> to display toasts.
- * Accessibility: role="status" region, role="alert" for errors (NFR-16).
+ * Accessibility (NFR-16):
+ *   - The toast region container is persistently mounted in the DOM with aria-live="polite",
+ *     establishing the live region before dynamic messages are injected (per MDN Live Regions guidelines).
+ *   - Individual toasts use role="status" (or role="alert" for error messages).
+ *   - Visible status icons pair with text to avoid relying on color alone.
  */
 import { type ReactNode, createContext, useCallback, useContext, useState } from 'react';
 
@@ -103,16 +108,20 @@ function ToastItem({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id: str
   );
 }
 
-function ToastRegion({
+/**
+ * ToastRegion container.
+ * Review fix (SCRUM-129): Always mount the region container in the DOM with aria-live="polite"
+ * so that screen readers register the live region prior to dynamic toast insertions (MDN guidelines).
+ */
+export function ToastRegion({
   toasts,
   onDismiss,
 }: {
   toasts: ToastItem[];
   onDismiss: (id: string) => void;
 }) {
-  if (!toasts.length) return null;
   return (
-    <div className="toast-region" aria-label="Thông báo">
+    <div className="toast-region" aria-label="Thông báo" aria-live="polite" aria-atomic="false">
       {toasts.map((t) => (
         <ToastItem key={t.id} toast={t} onDismiss={onDismiss} />
       ))}

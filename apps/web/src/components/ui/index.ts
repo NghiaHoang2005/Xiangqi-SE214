@@ -14,5 +14,5 @@ export type { BadgeProps, BadgeVariant } from './Badge';
 export { Dialog } from './Dialog';
 export type { DialogProps } from './Dialog';
 
-export { ToastProvider, useToast } from './Toast';
+export { ToastProvider, ToastRegion, useToast } from './Toast';
 export type { ToastItem, ToastVariant } from './Toast';
