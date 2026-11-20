@@ -85,8 +85,8 @@ export function HomePage() {
         <div className="home-title-bar" aria-hidden="true" />
 
         <p className="home-subtitle">
-          Đấu trí cùng bạn bè, rèn luyện với AI hoặc tranh tài xếp hạng đỉnh cao trong
-          không gian thư họa tinh tế.
+          Đấu trí cùng bạn bè, rèn luyện với AI hoặc tranh tài xếp hạng đỉnh cao trong không gian
+          thư họa tinh tế.
         </p>
       </section>
 
@@ -97,7 +97,9 @@ export function HomePage() {
             className={`home-banner ${status === 'disconnected' ? 'home-banner-danger' : 'home-banner-warning'}`}
             role="alert"
           >
-            <Badge variant={isConnecting ? 'warning' : status === 'reconnecting' ? 'warning' : 'danger'}>
+            <Badge
+              variant={isConnecting ? 'warning' : status === 'reconnecting' ? 'warning' : 'danger'}
+            >
               {isConnecting
                 ? 'Đang kết nối đến máy chủ…'
                 : status === 'reconnecting'
