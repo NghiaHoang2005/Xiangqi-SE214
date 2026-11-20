@@ -11,7 +11,7 @@ import { paths } from '../routes';
  */
 const ROOM_CODE_RE = /^[A-Z0-9]{8}$/;
 
-/** Normalises user input so we accept lowercase too. */
+/** Normalises user input so we accept lowercase and strips whitespace. */
 function normaliseCode(raw: string): string {
   return raw.replace(/\s+/g, '').toUpperCase();
 }
@@ -57,9 +57,38 @@ export function HomePage() {
   }
 
   return (
-    <section className="home-page">
-      <h1 className="home-title">Cờ Tướng Trực Tuyến</h1>
-      <p className="home-subtitle">Chơi cờ tướng trực tuyến với bạn bè hoặc đấu với máy.</p>
+    <div className="home-page">
+      {/* ── Decorative watermark background ─────────────── */}
+      <img
+        src="/assets/watermark-top-right.svg"
+        alt=""
+        aria-hidden="true"
+        className="home-watermark home-watermark-tr"
+      />
+      <img
+        src="/assets/watermark-bottom-left.svg"
+        alt=""
+        aria-hidden="true"
+        className="home-watermark home-watermark-bl"
+      />
+
+      {/* ── Hero header ─────────────────────────────────── */}
+      <section className="home-hero">
+        {/* Badge tag */}
+        <div className="home-badge">
+          <span className="home-badge-dot" aria-hidden="true" />
+          <span>HỆ THỐNG ĐẤU KỲ CHUẨN QUỐC TẾ</span>
+        </div>
+
+        {/* H1 — keep lowercase for router.test.tsx; CSS makes it uppercase */}
+        <h1 className="home-title">Cờ Tướng Trực Tuyến</h1>
+        <div className="home-title-bar" aria-hidden="true" />
+
+        <p className="home-subtitle">
+          Đấu trí cùng bạn bè, rèn luyện với AI hoặc tranh tài xếp hạng đỉnh cao trong
+          không gian thư họa tinh tế.
+        </p>
+      </section>
 
       {/* ── Service-unavailable banner (E2) ─────────────── */}
       <div className="home-banner-region" aria-live="polite">
@@ -68,7 +97,7 @@ export function HomePage() {
             className={`home-banner ${status === 'disconnected' ? 'home-banner-danger' : 'home-banner-warning'}`}
             role="alert"
           >
-            <Badge variant={status === 'disconnected' ? 'danger' : 'warning'}>
+            <Badge variant={isConnecting ? 'warning' : status === 'reconnecting' ? 'warning' : 'danger'}>
               {isConnecting
                 ? 'Đang kết nối đến máy chủ…'
                 : status === 'reconnecting'
@@ -94,18 +123,28 @@ export function HomePage() {
       </div>
 
       {/* ── Mode cards ─────────────────────────────────── */}
-      <div className="home-modes">
+      <section className="home-modes" aria-label="Chọn chế độ chơi">
         <button
           type="button"
           className="mode-card"
           disabled={isOffline}
           onClick={() => navigate(paths.room('new'))}
         >
-          <span className="mode-icon" aria-hidden="true">
-            👥
-          </span>
+          <div className="mode-icon-wrap">
+            <img
+              src="/assets/icon-friend.svg"
+              alt=""
+              aria-hidden="true"
+              className="mode-icon-img"
+              width="28"
+              height="28"
+            />
+          </div>
           <span className="mode-label">Chơi với bạn</span>
-          <span className="mode-desc">Tạo phòng và mời bạn bè bằng mã phòng.</span>
+          <span className="mode-desc">
+            Tạo phòng riêng hoặc chia sẻ liên kết tức thì cho bạn bè khắp mọi nơi.
+          </span>
+          <span className="mode-btn">Tạo phòng mới</span>
         </button>
 
         <button
@@ -114,31 +153,75 @@ export function HomePage() {
           disabled={isOffline}
           onClick={() => navigate(paths.aiSetup)}
         >
-          <span className="mode-icon" aria-hidden="true">
-            🤖
-          </span>
+          <div className="mode-icon-wrap">
+            <img
+              src="/assets/icon-ai.svg"
+              alt=""
+              aria-hidden="true"
+              className="mode-icon-img"
+              width="28"
+              height="28"
+            />
+          </div>
           <span className="mode-label">Chơi với máy</span>
-          <span className="mode-desc">Chọn độ khó và luyện tập kỹ năng cờ tướng.</span>
+          <span className="mode-desc">
+            Luyện tập cùng động cơ AI thông minh với 3 cấp độ: Dễ, Vừa, Khó.
+          </span>
+          <span className="mode-btn">Chơi ngay</span>
         </button>
-      </div>
+      </section>
 
       {/* ── Quick-join ─────────────────────────────────── */}
-      <form className="home-join" onSubmit={handleJoin} noValidate>
-        <Input
-          label="Vào phòng bằng mã"
-          placeholder="VD: ABCD1234"
-          value={roomCode}
-          autoComplete="off"
-          error={codeError}
-          onChange={(e) => {
-            setRoomCode(e.target.value);
-            if (codeError) setCodeError('');
-          }}
-        />
-        <Button type="submit" variant="primary" loading={joining} disabled={isOffline}>
-          Vào phòng
-        </Button>
-      </form>
-    </section>
+      <section className="home-join-section">
+        <div className="home-join-container">
+          <div className="home-join-card">
+            <h2 className="home-join-title">Vào phòng bằng mã</h2>
+            <form className="home-join" onSubmit={handleJoin} noValidate>
+              <div className="home-join-row">
+                <Input
+                  id="room-code-input"
+                  label="Nhập mã 8 ký tự:"
+                  aria-label="Vào phòng bằng mã"
+                  placeholder="VD: ABCD1234"
+                  value={roomCode}
+                  autoComplete="off"
+                  error={codeError}
+                  onChange={(e) => {
+                    setRoomCode(e.target.value);
+                    if (codeError) setCodeError('');
+                  }}
+                />
+                <Button type="submit" variant="primary" loading={joining} disabled={isOffline}>
+                  Vào phòng
+                </Button>
+              </div>
+            </form>
+          </div>
+
+          <div className="home-ticker">
+            <div className="home-ticker-item">
+              <span className="home-ticker-dot" aria-hidden="true" />
+              <span>1,482 kỳ thủ đang online</span>
+            </div>
+            <div className="home-ticker-item">
+              <img
+                src="/assets/icon-trophy.svg"
+                alt=""
+                aria-hidden="true"
+                className="home-ticker-trophy"
+                width="14"
+                height="14"
+              />
+              <span>Mùa giải 12 đang diễn ra</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Footer ──────────────────────────────────────── */}
+      <footer className="home-footer">
+        <p>© 2026 Cờ Tướng Online - Đồ án môn học SE214. All rights reserved.</p>
+      </footer>
+    </div>
   );
 }
