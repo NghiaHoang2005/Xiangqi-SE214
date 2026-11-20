@@ -33,8 +33,8 @@ export function HomePage() {
   const [codeError, setCodeError] = useState('');
   const [joining, setJoining] = useState(false);
 
-  const isConnecting = status === 'connecting';
-  const isOffline = status === 'disconnected' || status === 'reconnecting' || isConnecting;
+  const isConnecting = status === 'connecting' || status === 'idle';
+  const isOffline = status !== 'connected';
 
   /* ── Room-code form ────────────────────────────────────── */
   function handleJoin(e: FormEvent) {
@@ -69,14 +69,14 @@ export function HomePage() {
             role="alert"
           >
             <Badge variant={status === 'disconnected' ? 'danger' : 'warning'}>
-              {status === 'connecting'
+              {isConnecting
                 ? 'Đang kết nối đến máy chủ…'
                 : status === 'reconnecting'
                   ? 'Đang kết nối lại…'
                   : 'Mất kết nối đến máy chủ'}
             </Badge>
             <p className="home-banner-text">
-              {status === 'connecting'
+              {isConnecting
                 ? 'Vui lòng chờ trong giây lát…'
                 : 'Dịch vụ hiện không khả dụng. Vui lòng thử lại.'}
             </p>
