@@ -427,6 +427,7 @@ a:focus-visible {
   z-index: 300;
   max-width: 360px;
   width: calc(100vw - 48px);
+  pointer-events: none; /* Do not block clicks when empty */
 }
 
 .toast {
@@ -440,6 +441,7 @@ a:focus-visible {
   box-shadow: var(--shadow-md);
   animation: slide-up 0.2s ease;
   font-size: 14px;
+  pointer-events: auto; /* Re-enable pointer events for individual toast cards */
 }
 
 .toast-icon {

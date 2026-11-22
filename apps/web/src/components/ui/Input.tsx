@@ -50,16 +50,23 @@ export function Input({
         className={`input-field ${className}`.trim()}
       />
 
-      {error ? (
-        <span id={descId} className="input-error" role="alert">
-          <span aria-hidden="true">⚠</span>
-          {error}
-        </span>
-      ) : helperText ? (
-        <span id={descId} className="input-helper">
-          {helperText}
-        </span>
-      ) : null}
+      {/*
+       * Live region container for error and helper text feedback (A11y / NFR-16).
+       * Review fix (SCRUM-129): Pre-establishing the live region container ensures
+       * dynamic error messages are reliably announced by assistive technologies (MDN guidelines).
+       */}
+      <div className="input-feedback" aria-live="polite" aria-atomic="true">
+        {error ? (
+          <span id={descId} className="input-error" role="alert">
+            <span aria-hidden="true">⚠</span>
+            {error}
+          </span>
+        ) : helperText ? (
+          <span id={descId} className="input-helper">
+            {helperText}
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }

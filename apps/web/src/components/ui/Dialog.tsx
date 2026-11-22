@@ -29,20 +29,26 @@ const FOCUSABLE =
 export function Dialog({ open, onClose, title, description, footer, children }: DialogProps) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<Element | null>(null);
 
-  /* Focus first focusable element when dialog opens */
+  /*
+   * Save the trigger element and focus first focusable element when dialog opens.
+   * Review fix (SCRUM-129): Capture document.activeElement BEFORE moving focus
+   * into the dialog panel, so that the original trigger is preserved.
+   */
   useEffect(() => {
     if (!open) return;
+    triggerRef.current = document.activeElement;
     const first = panelRef.current?.querySelector<HTMLElement>(FOCUSABLE);
     first?.focus();
   }, [open]);
 
-  /* Restore focus to the trigger element when dialog closes */
-  const triggerRef = useRef<Element | null>(null);
+  /*
+   * Restore focus to the trigger element when dialog closes.
+   * Review fix (SCRUM-129): Ensure focus returns to the original trigger instead of <body>.
+   */
   useEffect(() => {
-    if (open) {
-      triggerRef.current = document.activeElement;
-    } else {
+    if (!open) {
       (triggerRef.current as HTMLElement | null)?.focus();
     }
   }, [open]);

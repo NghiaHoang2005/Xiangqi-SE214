@@ -57,4 +57,23 @@ describe('Dialog', () => {
     renderDialog();
     expect(screen.getByRole('dialog').getAttribute('aria-modal')).toBe('true');
   });
+
+  it('restores focus to the trigger element when closed', () => {
+    const trigger = document.createElement('button');
+    trigger.textContent = 'Mở dialog';
+    document.body.appendChild(trigger);
+    trigger.focus();
+
+    const { rerender } = render(<Dialog open={true} onClose={vi.fn()} title="Xác nhận" />);
+
+    // Verify focus moved into dialog
+    expect(document.activeElement).not.toBe(trigger);
+
+    // Close dialog
+    rerender(<Dialog open={false} onClose={vi.fn()} title="Xác nhận" />);
+
+    // Focus must be restored to trigger button
+    expect(document.activeElement).toBe(trigger);
+    document.body.removeChild(trigger);
+  });
 });
