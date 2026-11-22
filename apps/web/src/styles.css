@@ -89,6 +89,31 @@ a:focus-visible {
   font-weight: 600;
 }
 
+.app-header-end {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+}
+
+/* Guest session in the header (US-11) */
+.session-bar {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.session-bar-error {
+  color: var(--danger);
+}
+
+.nickname-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
 .app-main {
   padding: var(--space-6) var(--space-4);
   max-width: 960px;
