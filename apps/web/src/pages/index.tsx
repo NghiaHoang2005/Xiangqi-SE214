@@ -4,13 +4,7 @@ import { PlaceholderPage } from './PlaceholderPage';
 
 // UI text is Vietnamese (FR-25). Each placeholder names the story that replaces it.
 
-export const HomePage = () => (
-  <PlaceholderPage
-    title="Cờ Tướng Trực Tuyến"
-    description="Chọn Chơi với bạn hoặc Chơi với máy, tạo phòng hoặc vào bằng mã."
-    story="US-12"
-  />
-);
+export { HomePage } from './HomePage';
 
 export const RoomPage = () => (
   <PlaceholderPage
