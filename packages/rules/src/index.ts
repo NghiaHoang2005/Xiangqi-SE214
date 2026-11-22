@@ -15,5 +15,6 @@ export {
 
 export * from './fen';
 export * from './initial-position';
+export * from './move-generation';
 export * from './position';
 export * from './state-hash';
