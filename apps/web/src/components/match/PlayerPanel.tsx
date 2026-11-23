@@ -59,13 +59,8 @@ export function PlayerPanel({
     >
       <div className="player-panel-left">
         <div className="player-avatar" aria-hidden="true">
-          <span className={`player-avatar-emblem is-${side.toLowerCase()}`}>
-            {sideMeta.emblem}
-          </span>
-          <span
-            className={`player-side-dot is-${side.toLowerCase()}`}
-            title={sideMeta.label}
-          />
+          <span className={`player-avatar-emblem is-${side.toLowerCase()}`}>{sideMeta.emblem}</span>
+          <span className={`player-side-dot is-${side.toLowerCase()}`} title={sideMeta.label} />
         </div>
 
         <div className="player-meta">

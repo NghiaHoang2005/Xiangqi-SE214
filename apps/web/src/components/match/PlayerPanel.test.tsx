@@ -28,14 +28,7 @@ describe('PlayerPanel', () => {
 
   it('renders active turn badge and accent state for self when it is your turn', () => {
     const { container } = render(
-      <PlayerPanel
-        name="Bạn"
-        elo={1200}
-        side="RED"
-        isSelf
-        isCurrentTurn
-        clockText="09:18"
-      />,
+      <PlayerPanel name="Bạn" elo={1200} side="RED" isSelf isCurrentTurn clockText="09:18" />,
     );
 
     const panel = container.querySelector('.player-panel');

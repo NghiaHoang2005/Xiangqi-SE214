@@ -54,15 +54,7 @@ function BoardFrame({ bottomSide }: { bottomSide: Side }) {
     >
       <svg viewBox="0 0 360 400" className="match-board-svg" role="img" aria-hidden="true">
         <rect x="0" y="0" width="360" height="400" rx="8" fill="#e6cfa8" />
-        <rect
-          x="16"
-          y="16"
-          width="328"
-          height="368"
-          fill="none"
-          stroke="#5c4028"
-          strokeWidth="2"
-        />
+        <rect x="16" y="16" width="328" height="368" fill="none" stroke="#5c4028" strokeWidth="2" />
 
         {/* Horizontal rank lines */}
         {ranks.map((r) => {
@@ -77,7 +69,15 @@ function BoardFrame({ bottomSide }: { bottomSide: Side }) {
           const x = 24 + f * 39;
           if (f === 0 || f === 8) {
             return (
-              <line key={`f-${f}`} x1={x} y1="24" x2={x} y2="375" stroke="#6b4c30" strokeWidth="1" />
+              <line
+                key={`f-${f}`}
+                x1={x}
+                y1="24"
+                x2={x}
+                y2="375"
+                stroke="#6b4c30"
+                strokeWidth="1"
+              />
             );
           }
           return (
