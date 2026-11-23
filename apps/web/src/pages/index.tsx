@@ -22,13 +22,7 @@ export const AiSetupPage = () => (
   />
 );
 
-export const MatchPage = () => (
-  <PlaceholderPage
-    title="Bàn đấu"
-    description="Bàn cờ, đồng hồ, lượt đi, cầu hòa và đầu hàng."
-    story="US-16"
-  />
-);
+export { MatchPage } from './MatchPage';
 
 export const HistoryPage = () => (
   <PlaceholderPage
