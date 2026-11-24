@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import type { ConnectionState, Side } from '@xiangqi/shared';
+import type { ConnectionState, Side, Square } from '@xiangqi/shared';
 import { Button } from '../components/ui';
 import { PlayerPanel, type CapturedPiece } from '../components/match/PlayerPanel';
 import { TurnStatusBar } from '../components/match/TurnStatusBar';
+import { XiangqiBoard } from '../components/board';
 
 interface SeatInfo {
   name: string;
@@ -42,80 +43,15 @@ const DEFAULT_BLACK: SeatInfo = {
   ],
 };
 
-/** Static 9×10 board frame placeholder until US-16 board renderer is wired in. */
-function BoardFrame({ bottomSide }: { bottomSide: Side }) {
-  const files = Array.from({ length: 9 }, (_, i) => i);
-  const ranks = Array.from({ length: 10 }, (_, i) => i);
-
-  return (
-    <div
-      className="match-board-frame"
-      aria-label={`Bàn cờ tướng 9×10 (góc nhìn phe ${bottomSide === 'RED' ? 'Đỏ' : 'Đen'})`}
-    >
-      <svg viewBox="0 0 360 400" className="match-board-svg" role="img" aria-hidden="true">
-        <rect x="0" y="0" width="360" height="400" rx="8" fill="#e6cfa8" />
-        <rect x="16" y="16" width="328" height="368" fill="none" stroke="#5c4028" strokeWidth="2" />
-
-        {/* Horizontal rank lines */}
-        {ranks.map((r) => {
-          const y = 24 + r * 39;
-          return (
-            <line key={`r-${r}`} x1="24" y1={y} x2="336" y2={y} stroke="#6b4c30" strokeWidth="1" />
-          );
-        })}
-
-        {/* Vertical file lines (split at the river between rank 4 and 5) */}
-        {files.map((f) => {
-          const x = 24 + f * 39;
-          if (f === 0 || f === 8) {
-            return (
-              <line
-                key={`f-${f}`}
-                x1={x}
-                y1="24"
-                x2={x}
-                y2="375"
-                stroke="#6b4c30"
-                strokeWidth="1"
-              />
-            );
-          }
-          return (
-            <g key={`f-${f}`}>
-              <line x1={x} y1="24" x2={x} y2="180" stroke="#6b4c30" strokeWidth="1" />
-              <line x1={x} y1="219" x2={x} y2="375" stroke="#6b4c30" strokeWidth="1" />
-            </g>
-          );
-        })}
-
-        {/* Palace diagonals */}
-        <line x1="141" y1="24" x2="219" y2="102" stroke="#6b4c30" strokeWidth="1" />
-        <line x1="219" y1="24" x2="141" y2="102" stroke="#6b4c30" strokeWidth="1" />
-        <line x1="141" y1="297" x2="219" y2="375" stroke="#6b4c30" strokeWidth="1" />
-        <line x1="219" y1="297" x2="141" y2="375" stroke="#6b4c30" strokeWidth="1" />
-
-        {/* River text */}
-        <text x="72" y="205" fill="#6b4c30" fontSize="15" fontFamily="serif">
-          楚 河
-        </text>
-        <text x="148" y="204" fill="#7d6146" fontSize="10" letterSpacing="1">
-          SÔNG CHU HÀ
-        </text>
-        <text x="256" y="205" fill="#6b4c30" fontSize="15" fontFamily="serif">
-          漢 界
-        </text>
-      </svg>
-    </div>
-  );
-}
-
 /**
- * Match screen — US-16 / SCRUM-152 (Panel thông tin lượt/đối thủ).
+ * Match screen — SCRUM-151: Render 9×10 Xiangqi board & perspective flip.
+ * Integrates PlayerPanel, TurnStatusBar, and XiangqiBoard.
  */
 export function MatchPage() {
   const { matchId = 'M-9821' } = useParams();
   const [bottomSide, setBottomSide] = useState<Side>('RED');
   const [currentTurn, setCurrentTurn] = useState<Side>('RED');
+  const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
 
   const topSeat = bottomSide === 'RED' ? DEFAULT_BLACK : DEFAULT_RED;
   const bottomSeat = bottomSide === 'RED' ? DEFAULT_RED : DEFAULT_BLACK;
@@ -148,7 +84,16 @@ export function MatchPage() {
             capturedPieces={topSeat.capturedPieces}
           />
 
-          <BoardFrame bottomSide={bottomSide} />
+          <XiangqiBoard
+            orientation={bottomSide}
+            turn={currentTurn}
+            selectedSquare={selectedSquare}
+            onSquareClick={(sq) =>
+              setSelectedSquare((prev) =>
+                prev?.file === sq.file && prev?.rank === sq.rank ? null : sq,
+              )
+            }
+          />
 
           <PlayerPanel
             name={bottomSeat.name}
