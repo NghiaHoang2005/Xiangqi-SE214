@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { destinations, movesFor } from './move-test-helpers';
+import { destinations, movesFor } from './move.test-utils';
 
 describe.each(['RED', 'BLACK'] as const)('cannon (%s)', (side) => {
   it('moves through empty squares along all four rays', () => {

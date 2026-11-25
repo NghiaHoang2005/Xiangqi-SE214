@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { destinations, movesFor } from './move-test-helpers';
+import { destinations, movesFor } from './move.test-utils';
 
 describe.each(['RED', 'BLACK'] as const)('chariot (%s)', (side) => {
   it('slides along all four rays', () => {

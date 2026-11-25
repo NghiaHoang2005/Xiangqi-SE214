@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { destinations, movesFor } from './move-test-helpers';
+import { destinations, movesFor } from './move.test-utils';
 
 describe.each(['RED', 'BLACK'] as const)('general (%s)', (side) => {
   it('moves orthogonally inside the palace', () => {

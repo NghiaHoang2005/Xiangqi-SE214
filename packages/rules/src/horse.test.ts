@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { destinations, movesFor } from './move-test-helpers';
+import { destinations, movesFor } from './move.test-utils';
 
 describe.each(['RED', 'BLACK'] as const)('horse (%s)', (side) => {
   const all = destinations([2, 3], [2, 5], [6, 3], [6, 5], [3, 2], [5, 2], [3, 6], [5, 6]);
