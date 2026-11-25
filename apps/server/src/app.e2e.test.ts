@@ -1,5 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { INITIAL_FEN, createInitialPosition } from '@xiangqi/rules';
 import {
   ClientEvent,
   GUEST_SESSION_COOKIE,
@@ -7,6 +8,7 @@ import {
   SystemEvent,
   isValidJoinCode,
   type Ack,
+  type MatchStartedPayload,
   type PingResult,
   type RoomView,
 } from '@xiangqi/shared';
@@ -38,6 +40,20 @@ describe.skipIf(!hasTestDb)('server (e2e)', () => {
       extraHeaders: { cookie },
     });
     return { guestId, socket };
+  }
+
+  function nextEvent<T>(socket: Socket, event: string): Promise<T> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        socket.off(event, onEvent);
+        reject(new Error(`Timed out waiting for ${event}`));
+      }, 2000);
+      function onEvent(payload: T) {
+        clearTimeout(timer);
+        resolve(payload);
+      }
+      socket.once(event, onEvent);
+    });
   }
 
   beforeAll(async () => {
@@ -224,9 +240,7 @@ describe.skipIf(!hasTestDb)('server (e2e)', () => {
         .timeout(2000)
         .emitWithAck(ClientEvent.CloseRoom, { roomId });
       expect(forbidden).toMatchObject({ ok: false, error: { code: 'ACCESS_DENIED' } });
-      const update = new Promise<RoomView>((resolve) =>
-        host.socket.once(ServerEvent.RoomUpdated, resolve),
-      );
+      const update = nextEvent<RoomView>(host.socket, ServerEvent.RoomUpdated);
       const closed = await host.socket.timeout(2000).emitWithAck(ClientEvent.CloseRoom, { roomId });
       expect(closed).toMatchObject({ ok: true, data: { roomId, status: 'CLOSED' } });
       await expect(update).resolves.toMatchObject({ roomId, status: 'CLOSED', yourSide: 'BLACK' });
@@ -234,6 +248,125 @@ describe.skipIf(!hasTestDb)('server (e2e)', () => {
       host.socket.close();
       other.socket.close();
       anonymous.close();
+    }
+  });
+
+  it('allocates the last seat once under concurrent joins and starts the same match for both players', async () => {
+    const host = await connectGuest('Host player');
+    const first = await connectGuest('First challenger');
+    const second = await connectGuest('Second challenger');
+    try {
+      const created: Ack<RoomView> = await host.socket
+        .timeout(2000)
+        .emitWithAck(ClientEvent.CreateRoom, {
+          timeControl: { initialMinutes: 5, incrementSeconds: 0 },
+          preferredSide: 'BLACK',
+        });
+      if (!created.ok) throw new Error('CreateRoom failed');
+      const { roomId, joinCode } = created.data;
+      const hostUpdate = nextEvent<RoomView>(host.socket, ServerEvent.RoomUpdated);
+      const hostStarted = nextEvent<MatchStartedPayload>(host.socket, ServerEvent.MatchStarted);
+      const receivedMatches = new Map<string, MatchStartedPayload>();
+      const receivedRooms = new Map<string, RoomView>();
+      for (const guest of [first, second]) {
+        guest.socket.on(ServerEvent.MatchStarted, (match: MatchStartedPayload) => {
+          receivedMatches.set(guest.guestId, match);
+        });
+        guest.socket.on(ServerEvent.RoomUpdated, (room: RoomView) => {
+          receivedRooms.set(guest.guestId, room);
+        });
+      }
+
+      const joinByCode = `${joinCode.slice(0, 4)}-${joinCode.slice(4)}`.toLowerCase();
+      const joins: Array<Ack<RoomView>> = await Promise.all([
+        first.socket.timeout(2000).emitWithAck(ClientEvent.JoinRoom, { joinCode: joinByCode }),
+        second.socket.timeout(2000).emitWithAck(ClientEvent.JoinRoom, { roomId }),
+      ]);
+      const winningIndex = joins.findIndex((join) => join.ok);
+      expect(winningIndex).toBeGreaterThanOrEqual(0);
+      const winner = [first, second][winningIndex];
+      const [accepted, refused] = [joins[winningIndex], joins[1 - winningIndex]];
+      if (!accepted.ok) throw new Error('JoinRoom failed');
+      expect(refused).toMatchObject({ ok: false, error: { code: 'ROOM_FULL' } });
+      const matchId = accepted.data.matchId;
+      expect(accepted.data).toMatchObject({ roomId, status: 'STARTED', yourSide: 'RED' });
+
+      await expect(hostUpdate).resolves.toMatchObject({
+        roomId,
+        matchId,
+        status: 'STARTED',
+        yourSide: 'BLACK',
+      });
+      const started = await hostStarted;
+      expect(started).toMatchObject({
+        roomId,
+        matchId,
+        version: 0,
+        turn: 'RED',
+        fen: INITIAL_FEN,
+        clocks: { redMs: 300_000, blackMs: 300_000 },
+        players: { RED: { guestId: winner.guestId }, BLACK: { guestId: host.guestId } },
+      });
+      await expect.poll(() => receivedMatches.get(winner.guestId)).toEqual(started);
+      expect(receivedRooms.get(winner.guestId)).toMatchObject({ matchId, yourSide: 'RED' });
+
+      const retried = await winner.socket
+        .timeout(2000)
+        .emitWithAck(ClientEvent.JoinRoom, { roomId });
+      expect(retried).toMatchObject({ ok: true, data: { matchId, yourSide: 'RED' } });
+      const db = app.get(PrismaService);
+      expect(await db.roomSeat.count({ where: { roomId } })).toBe(2);
+      expect(await db.match.findMany({ where: { roomId } })).toMatchObject([
+        {
+          matchId,
+          version: 0,
+          mode: 'PVP',
+          turn: 'RED',
+          snapshot: createInitialPosition(),
+          redGuestId: winner.guestId,
+          blackGuestId: host.guestId,
+        },
+      ]);
+    } finally {
+      host.socket.close();
+      first.socket.close();
+      second.socket.close();
+    }
+  });
+
+  it('rejects unknown join codes and closed or expired rooms', async () => {
+    const host = await connectGuest('Waiting host');
+    const guest = await connectGuest('Waiting guest');
+    try {
+      const missing = await guest.socket
+        .timeout(2000)
+        .emitWithAck(ClientEvent.JoinRoom, { joinCode: 'wrong-code' });
+      expect(missing).toMatchObject({ ok: false, error: { code: 'ROOM_NOT_FOUND' } });
+      const created: Ack<RoomView> = await host.socket
+        .timeout(2000)
+        .emitWithAck(ClientEvent.CreateRoom, {
+          timeControl: { initialMinutes: 15, incrementSeconds: 5 },
+          preferredSide: 'RANDOM',
+        });
+      if (!created.ok) throw new Error('CreateRoom failed');
+      const { roomId, joinCode } = created.data;
+      await host.socket.timeout(2000).emitWithAck(ClientEvent.CloseRoom, { roomId });
+      const closed = await guest.socket
+        .timeout(2000)
+        .emitWithAck(ClientEvent.JoinRoom, { joinCode });
+      expect(closed).toMatchObject({ ok: false, error: { code: 'ROOM_EXPIRED' } });
+
+      await app.get(PrismaService).room.update({
+        where: { roomId },
+        data: { status: 'WAITING', expiresAt: new Date(0) },
+      });
+      const expired = await guest.socket
+        .timeout(2000)
+        .emitWithAck(ClientEvent.JoinRoom, { roomId });
+      expect(expired).toMatchObject({ ok: false, error: { code: 'ROOM_EXPIRED' } });
+    } finally {
+      host.socket.close();
+      guest.socket.close();
     }
   });
 });
