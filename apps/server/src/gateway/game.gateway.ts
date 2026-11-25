@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Logger, type OnModuleDestroy } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -32,6 +32,8 @@ function socketRoomName(roomId: string): string {
   return `room:${roomId}`;
 }
 
+const ROOM_EXPIRY_CHECK_MS = 30_000;
+
 /**
  * Single Socket.IO entry point (SRS 9.3). Feature modules add their events here
  * (CreateRoom, SubmitMove, ...) and delegate to their services.
@@ -43,8 +45,12 @@ function socketRoomName(roomId: string): string {
     ? { origin: process.env.WEB_ORIGIN.split(','), credentials: true }
     : false,
 })
-export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+export class GameGateway
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
+{
   private readonly logger = new Logger(GameGateway.name);
+  private expiryTimer?: NodeJS.Timeout;
+  private expiryRun?: Promise<void>;
 
   @WebSocketServer()
   server!: Server;
@@ -65,6 +71,17 @@ export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
         () => next(new Error('Guest session lookup failed')),
       );
     });
+    this.expiryTimer = setInterval(() => {
+      if (this.expiryRun) return;
+      this.expiryRun = this.expireRooms().finally(() => {
+        this.expiryRun = undefined;
+      });
+    }, ROOM_EXPIRY_CHECK_MS).unref();
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    clearInterval(this.expiryTimer);
+    await this.expiryRun;
   }
 
   handleConnection(client: Socket): void {
@@ -171,5 +188,14 @@ export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       if (namespace.sockets.get(socketId)?.data.guestId === guestId) return true;
     }
     return false;
+  }
+
+  private async expireRooms(): Promise<void> {
+    try {
+      const expired = await this.rooms.expireWaitingRooms();
+      await Promise.all(expired.map((room) => this.publishRoomUpdate(room)));
+    } catch {
+      this.logger.warn('Waiting room expiry check failed');
+    }
   }
 }

@@ -19,6 +19,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from './app.module';
 import { configureApp } from './bootstrap';
 import { PrismaService } from './database/prisma.service';
+import { RoomService } from './modules/room/room.service';
 import { TEST_DATABASE_URL, hasTestDb, resetTestDatabase } from './test/test-db';
 
 describe.skipIf(!hasTestDb)('server (e2e)', () => {
@@ -367,6 +368,34 @@ describe.skipIf(!hasTestDb)('server (e2e)', () => {
     } finally {
       host.socket.close();
       guest.socket.close();
+    }
+  });
+
+  it('expires idle waiting rooms once and keeps rooms whose idle timer has not elapsed', async () => {
+    const host = await connectGuest('Idle room host');
+    try {
+      const rooms = app.get(RoomService);
+      const config = {
+        timeControl: { initialMinutes: 5, incrementSeconds: 0 },
+        preferredSide: 'RED',
+      } as const;
+      const idle = await rooms.create(host.guestId, config);
+      const fresh = await rooms.create(host.guestId, config);
+      const now = new Date();
+      const db = app.get(PrismaService);
+      await db.room.update({ where: { roomId: idle.roomId }, data: { expiresAt: now } });
+
+      const expired = await rooms.expireWaitingRooms(now);
+      expect(expired).toContainEqual(
+        expect.objectContaining({ roomId: idle.roomId, status: 'EXPIRED' }),
+      );
+      expect(expired.some((room) => room.roomId === fresh.roomId)).toBe(false);
+      expect(await rooms.expireWaitingRooms(now)).toEqual([]);
+      expect(await db.room.findUnique({ where: { roomId: fresh.roomId } })).toMatchObject({
+        status: 'WAITING',
+      });
+    } finally {
+      host.socket.close();
     }
   });
 });
