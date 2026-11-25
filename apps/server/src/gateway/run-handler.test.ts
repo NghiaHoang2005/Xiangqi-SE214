@@ -20,6 +20,20 @@ describe('runHandler', () => {
     }
   });
 
+  it('passes DomainException details through to the client', async () => {
+    const allowed = [{ initialMinutes: 5, incrementSeconds: 0 }];
+    const ack = await runHandler(undefined, () => {
+      throw new DomainException(ErrorCode.VALIDATION_FAILED, 'Bad time control', undefined, {
+        field: 'timeControl',
+        allowed,
+      });
+    });
+    expect(ack.ok).toBe(false);
+    if (!ack.ok) {
+      expect(ack.error.details).toEqual({ field: 'timeControl', allowed });
+    }
+  });
+
   it('hides internal error details', async () => {
     const ack = await runHandler(undefined, () => {
       throw new Error('db password is hunter2');
