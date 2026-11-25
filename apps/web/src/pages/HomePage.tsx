@@ -124,7 +124,7 @@ export function HomePage() {
           type="button"
           className="mode-card"
           disabled={isOffline}
-          onClick={() => navigate(paths.room('new'))}
+          onClick={() => navigate(paths.createRoom)}
         >
           <div className="mode-icon-wrap">
             <img
