@@ -106,9 +106,9 @@ Host                         Server                          Guest
  | <-- MatchStarted           |   MatchStarted -->            |
 ```
 
-## Decisions to confirm
+## Agreed decisions
 
-These values are already in code and are easy to change:
+Confirmed by the team on 2026-11-25:
 
 1. Nickname length 2–20 (`NICKNAME_MIN_LENGTH`, `NICKNAME_MAX_LENGTH`). The DB column allows 32.
 2. Join code alphabet without `0 O 1 I L U` (`JOIN_CODE_ALPHABET`).
