@@ -5,6 +5,7 @@ import { PlaceholderPage } from './PlaceholderPage';
 // UI text is Vietnamese (FR-25). Each placeholder names the story that replaces it.
 
 export { HomePage } from './HomePage';
+export { CreateRoomPage } from './CreateRoomPage';
 
 export const RoomPage = () => (
   <PlaceholderPage
