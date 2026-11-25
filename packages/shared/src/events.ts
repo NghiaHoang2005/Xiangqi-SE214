@@ -5,6 +5,7 @@
 export const ClientEvent = {
   CreateRoom: 'CreateRoom',
   JoinRoom: 'JoinRoom',
+  CloseRoom: 'CloseRoom',
   CreateAIMatch: 'CreateAIMatch',
   SubmitMove: 'SubmitMove',
   DrawOffer: 'DrawOffer',
@@ -15,6 +16,7 @@ export const ClientEvent = {
 } as const;
 
 export const ServerEvent = {
+  RoomUpdated: 'RoomUpdated',
   MatchStarted: 'MatchStarted',
   MoveAccepted: 'MoveAccepted',
   MoveRejected: 'MoveRejected',
@@ -28,6 +30,22 @@ export const ServerEvent = {
 
 export type ClientEvent = (typeof ClientEvent)[keyof typeof ClientEvent];
 export type ServerEvent = (typeof ServerEvent)[keyof typeof ServerEvent];
+
+/**
+ * Request and Ack data per client event, for the events whose contract is agreed.
+ * Both the gateway handlers and the web socket wrapper type against this map.
+ */
+export interface ClientEventContracts {
+  CreateRoom: { request: import('./room').CreateRoomRequest; ack: import('./room').RoomView };
+  JoinRoom: { request: import('./room').JoinRoomRequest; ack: import('./room').RoomView };
+  CloseRoom: { request: import('./room').CloseRoomRequest; ack: import('./room').RoomView };
+}
+
+/** Payload per server → client event, for the events whose contract is agreed. */
+export interface ServerEventPayloads {
+  RoomUpdated: import('./room').RoomUpdatedPayload;
+  MatchStarted: import('./room').MatchStartedPayload;
+}
 
 /** Socket.IO acknowledgement returned by every client → server event handler. */
 export type Ack<T> =
