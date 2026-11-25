@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import {
+  ConnectedSocket,
   MessageBody,
   OnGatewayInit,
   OnGatewayConnection,
@@ -8,10 +9,26 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
-import { SystemEvent, type Ack, type PingResult, type RequestEnvelope } from '@xiangqi/shared';
+import {
+  ClientEvent,
+  ServerEvent,
+  SystemEvent,
+  type Ack,
+  type CloseRoomRequest,
+  type CreateRoomRequest,
+  type GuestSessionView,
+  type PingResult,
+  type RequestEnvelope,
+  type RoomView,
+} from '@xiangqi/shared';
 import type { Server, Socket } from 'socket.io';
 import { GuestSessionService, readGuestSessionToken } from '../modules/auth/guest-session.service';
+import { RoomService } from '../modules/room/room.service';
 import { runHandler } from './run-handler';
+
+function socketRoomName(roomId: string): string {
+  return `room:${roomId}`;
+}
 
 /**
  * Single Socket.IO entry point (SRS 9.3). Feature modules add their events here
@@ -30,14 +47,17 @@ export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
   @WebSocketServer()
   server!: Server;
 
-  constructor(private readonly guestSessions: GuestSessionService) {}
+  constructor(
+    private readonly guestSessions: GuestSessionService,
+    private readonly rooms: RoomService,
+  ) {}
 
   afterInit(server: Server): void {
     server.use((client, next) => {
       const token = readGuestSessionToken(client.handshake.headers.cookie);
       void this.guestSessions.authenticate(token).then(
         (session) => {
-          if (session) client.data.guestSessionToken = token;
+          if (session) client.data.guestId = session.guestId;
           next();
         },
         () => next(new Error('Guest session lookup failed')),
@@ -56,5 +76,51 @@ export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
   @SubscribeMessage(SystemEvent.Ping)
   ping(@MessageBody() payload: RequestEnvelope | undefined): Promise<Ack<PingResult>> {
     return runHandler(payload, () => ({ serverTime: Date.now() }));
+  }
+
+  @SubscribeMessage(ClientEvent.CreateRoom)
+  createRoom(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: CreateRoomRequest | undefined,
+  ): Promise<Ack<RoomView>> {
+    return runHandler(payload, async () => {
+      const guest = await this.authenticateGuest(client);
+      const room = await this.rooms.create(guest.guestId, payload);
+      await client.join(socketRoomName(room.roomId));
+      return room;
+    });
+  }
+
+  @SubscribeMessage(ClientEvent.CloseRoom)
+  closeRoom(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: CloseRoomRequest | undefined,
+  ): Promise<Ack<RoomView>> {
+    return runHandler(payload, async () => {
+      const guest = await this.authenticateGuest(client);
+      const room = await this.rooms.close(guest.guestId, payload?.roomId);
+      setImmediate(() => {
+        void this.publishRoomUpdate(room).catch(() => {
+          this.logger.warn(`RoomUpdated delivery failed roomId=${room.roomId}`);
+        });
+      });
+      return room;
+    });
+  }
+
+  private authenticateGuest(client: Socket): Promise<GuestSessionView> {
+    const token = client.data.guestId
+      ? readGuestSessionToken(client.handshake.headers.cookie)
+      : undefined;
+    return this.guestSessions.require(token);
+  }
+
+  private async publishRoomUpdate(room: RoomView): Promise<void> {
+    const sockets = await this.server.in(socketRoomName(room.roomId)).fetchSockets();
+    for (const socket of sockets) {
+      const yourSide =
+        room.seats.find((seat) => seat.guestId === socket.data.guestId)?.side ?? null;
+      socket.emit(ServerEvent.RoomUpdated, { ...room, yourSide });
+    }
   }
 }
