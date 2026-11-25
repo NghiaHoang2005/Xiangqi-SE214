@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import {
   MessageBody,
+  OnGatewayInit,
   OnGatewayConnection,
   OnGatewayDisconnect,
   SubscribeMessage,
@@ -9,6 +10,7 @@ import {
 } from '@nestjs/websockets';
 import { SystemEvent, type Ack, type PingResult, type RequestEnvelope } from '@xiangqi/shared';
 import type { Server, Socket } from 'socket.io';
+import { GuestSessionService, readGuestSessionToken } from '../modules/auth/guest-session.service';
 import { runHandler } from './run-handler';
 
 /**
@@ -22,11 +24,26 @@ import { runHandler } from './run-handler';
     ? { origin: process.env.WEB_ORIGIN.split(','), credentials: true }
     : false,
 })
-export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(GameGateway.name);
 
   @WebSocketServer()
   server!: Server;
+
+  constructor(private readonly guestSessions: GuestSessionService) {}
+
+  afterInit(server: Server): void {
+    server.use((client, next) => {
+      const token = readGuestSessionToken(client.handshake.headers.cookie);
+      void this.guestSessions.authenticate(token).then(
+        (session) => {
+          if (session) client.data.guestSessionToken = token;
+          next();
+        },
+        () => next(new Error('Guest session lookup failed')),
+      );
+    });
+  }
 
   handleConnection(client: Socket): void {
     this.logger.log(`socket connected id=${client.id}`);
