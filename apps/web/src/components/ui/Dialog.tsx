@@ -1,8 +1,3 @@
-/**
- * Dialog component — US-07, SCRUM-129.
- * Modal with focus trap, Esc-to-close, backdrop click, and proper ARIA roles.
- * Accessibility: role="dialog", aria-modal, aria-labelledby (NFR-16).
- */
 import {
   type KeyboardEvent,
   type MouseEvent,
@@ -17,12 +12,10 @@ export interface DialogProps {
   onClose: () => void;
   title: string;
   description?: string;
-  /** Action buttons rendered in the footer (e.g. <Button>, <Button variant="danger">). */
   footer?: ReactNode;
   children?: ReactNode;
 }
 
-/** All keyboard-focusable elements. */
 const FOCUSABLE =
   'a[href],button:not(:disabled),input:not(:disabled),textarea:not(:disabled),select:not(:disabled),[tabindex]:not([tabindex="-1"])';
 
@@ -31,11 +24,7 @@ export function Dialog({ open, onClose, title, description, footer, children }: 
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<Element | null>(null);
 
-  /*
-   * Save the trigger element and focus first focusable element when dialog opens.
-   * Review fix (SCRUM-129): Capture document.activeElement BEFORE moving focus
-   * into the dialog panel, so that the original trigger is preserved.
-   */
+  // Read activeElement before moving focus, so it is still the trigger.
   useEffect(() => {
     if (!open) return;
     triggerRef.current = document.activeElement;
@@ -43,17 +32,12 @@ export function Dialog({ open, onClose, title, description, footer, children }: 
     first?.focus();
   }, [open]);
 
-  /*
-   * Restore focus to the trigger element when dialog closes.
-   * Review fix (SCRUM-129): Ensure focus returns to the original trigger instead of <body>.
-   */
   useEffect(() => {
     if (!open) {
       (triggerRef.current as HTMLElement | null)?.focus();
     }
   }, [open]);
 
-  /* Focus trap inside the dialog */
   function handleKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     if (e.key === 'Escape') {
       onClose();
@@ -80,7 +64,6 @@ export function Dialog({ open, onClose, title, description, footer, children }: 
     }
   }
 
-  /* Close on backdrop click (not on panel click) */
   function handleBackdropClick(e: MouseEvent<HTMLDivElement>) {
     if (e.target === e.currentTarget) onClose();
   }

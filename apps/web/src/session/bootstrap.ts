@@ -1,3 +1,4 @@
+import { ErrorCode } from '@xiangqi/shared';
 import { ApiRequestError, type ClientError } from '../lib/errors';
 import { newRequestId } from '../lib/request-id';
 import { getServices } from '../services';
@@ -8,28 +9,24 @@ function toClientError(err: unknown): ClientError {
   return { code: 'INTERNAL_ERROR', message: String(err), requestId: newRequestId() };
 }
 
-let inFlight: Promise<void> | null = null;
+let inFlight: Promise<boolean> | null = null;
 
-/**
- * UC-01: make sure a guest session exists, then open the realtime connection
- * (the socket handshake needs the session cookie). Safe to call many times:
- * concurrent calls share one request, and a ready session is not fetched again.
- */
-export function ensureSession(): Promise<void> {
-  const store = useSessionStore.getState();
-  if (store.status === 'ready') return Promise.resolve();
+// Resolves true when the server created a new session (the previous one had expired).
+function bootstrap(showLoading: boolean): Promise<boolean> {
   if (inFlight) return inFlight;
-
-  store.setLoading();
+  if (showLoading) useSessionStore.getState().setLoading();
   const services = getServices();
   inFlight = services.session
     .bootstrap()
     .then((session) => {
+      const hadSession = useSessionStore.getState().session !== null;
       useSessionStore.getState().setSession(session);
-      services.connect();
+      if (!hadSession || session.isNew) services.connect();
+      return session.isNew;
     })
     .catch((err: unknown) => {
       useSessionStore.getState().setError(toClientError(err));
+      return false;
     })
     .finally(() => {
       inFlight = null;
@@ -37,19 +34,42 @@ export function ensureSession(): Promise<void> {
   return inFlight;
 }
 
-/** Re-run UC-01 after the server reported the session as gone (E1), keeping the user in place. */
-export function renewSession(): Promise<void> {
-  useSessionStore.setState({ status: 'idle' });
-  return ensureSession();
+export async function ensureSession(): Promise<void> {
+  if (useSessionStore.getState().status === 'ready') return;
+  await bootstrap(true);
 }
 
-/** Set or clear the nickname. Throws ApiRequestError so the form can show the message. */
-export async function updateNickname(nickname: string | null): Promise<void> {
-  const session = await getServices().session.setNickname(nickname);
+/** UC-01 re-run after the session expired, without hiding the current screen. */
+export function renewSession(): Promise<boolean> {
+  return bootstrap(false);
+}
+
+/**
+ * Runs a service call; if the server answers ACCESS_DENIED because the session expired,
+ * creates a new session (UC-01) and retries once. A real permission error is rethrown,
+ * because the server then reuses the still-valid session.
+ */
+export async function withSession<T>(call: () => Promise<T>): Promise<T> {
+  try {
+    return await call();
+  } catch (err) {
+    if (!(err instanceof ApiRequestError) || err.error.code !== ErrorCode.ACCESS_DENIED) throw err;
+    if (!(await renewSession())) throw err;
+    return call();
+  }
+}
+
+/** Retry for "service unavailable": the socket can only connect once a session exists. */
+export function retryConnection(): void {
+  if (useSessionStore.getState().status === 'ready') getServices().connect();
+  else void ensureSession();
+}
+
+export async function updateNickname(nickname: string): Promise<void> {
+  const session = await withSession(() => getServices().session.setNickname(nickname));
   useSessionStore.getState().setSession(session);
 }
 
-/** Tests only. */
 export function resetSessionForTests(): void {
   inFlight = null;
   useSessionStore.setState({ status: 'idle', session: null, error: null });

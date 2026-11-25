@@ -1,7 +1,3 @@
-/**
- * Public barrel for the shared UI kit — SCRUM-129.
- * Import from '@/components/ui' (or relative path).
- */
 export { Button } from './Button';
 export type { ButtonProps, ButtonVariant, ButtonSize } from './Button';
 

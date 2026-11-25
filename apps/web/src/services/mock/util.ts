@@ -1,30 +1,37 @@
-import type { ErrorCode } from '@xiangqi/shared';
+import {
+  JOIN_CODE_ALPHABET,
+  JOIN_CODE_LENGTH,
+  type ApiErrorDetails,
+  type ErrorCode,
+} from '@xiangqi/shared';
 import { ApiRequestError, type ClientOnlyCode } from '../../lib/errors';
 import { newRequestId } from '../../lib/request-id';
 
-/** Throws the same error shape the real backend produces. */
-export function fail(code: ErrorCode | ClientOnlyCode, message: string): never {
-  throw new ApiRequestError({ code, message, requestId: newRequestId() });
+export function fail(
+  code: ErrorCode | ClientOnlyCode,
+  message: string,
+  details?: ApiErrorDetails,
+): never {
+  throw new ApiRequestError({ code, message, requestId: newRequestId(), details });
 }
 
 export function delay(ms: number): Promise<void> {
   return ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
 }
 
-export function randomHex(bytes: number): string {
+export function randomBase64Url(bytes: number): string {
   const buf = crypto.getRandomValues(new Uint8Array(bytes));
-  return Array.from(buf, (b) => b.toString(16).padStart(2, '0')).join('');
+  return btoa(String.fromCharCode(...buf))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
 }
 
-/** No 0/O/1/I so a code read aloud is not mistyped. */
-const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-
-export function randomCode(length = 8): string {
-  const buf = crypto.getRandomValues(new Uint8Array(length));
-  return Array.from(buf, (b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join('');
+export function randomJoinCode(): string {
+  const buf = crypto.getRandomValues(new Uint8Array(JOIN_CODE_LENGTH));
+  return Array.from(buf, (b) => JOIN_CODE_ALPHABET[b % JOIN_CODE_ALPHABET.length]).join('');
 }
 
-/** Storage that lives only in memory: used by tests to simulate separate tabs. */
 export function createMemoryStorage(): Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> {
   const data = new Map<string, string>();
   return {
@@ -49,6 +56,6 @@ export function writeJson(storage: KeyValueStorage, key: string, value: unknown)
   try {
     storage.setItem(key, JSON.stringify(value));
   } catch {
-    // Storage full or blocked (private mode): the mock just forgets.
+    // Storage full or blocked: the mock just forgets.
   }
 }

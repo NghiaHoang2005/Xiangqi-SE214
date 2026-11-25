@@ -1,14 +1,19 @@
+import {
+  isValidNickname,
+  NICKNAME_MAX_LENGTH,
+  NICKNAME_MIN_LENGTH,
+  normalizeNickname,
+} from '@xiangqi/shared';
 import { type FormEvent, useEffect, useState } from 'react';
 import { Button, Dialog, Input } from '../components/ui';
 import { ApiRequestError } from '../lib/errors';
-import { NICKNAME_MAX_LENGTH, NICKNAME_MIN_LENGTH } from '../services';
 import { updateNickname } from './bootstrap';
 
-/** Client-side check, same bounds the server enforces. Returns an error message or ''. */
+/** Returns the error message, or '' when valid. */
 export function validateNickname(raw: string): string {
-  const value = raw.trim();
-  if (value.length === 0) return '';
-  if (value.length < NICKNAME_MIN_LENGTH || value.length > NICKNAME_MAX_LENGTH) {
+  const value = normalizeNickname(raw);
+  if (value === null) return '';
+  if (!isValidNickname(value)) {
     return `Biệt danh dài từ ${NICKNAME_MIN_LENGTH} đến ${NICKNAME_MAX_LENGTH} ký tự.`;
   }
   return '';
@@ -20,7 +25,6 @@ export interface NicknameDialogProps {
   current: string | null;
 }
 
-/** US-11: optional nickname. Empty means "play as Khách". */
 export function NicknameDialog({ open, onClose, current }: NicknameDialogProps) {
   const [value, setValue] = useState(current ?? '');
   const [error, setError] = useState('');
@@ -42,7 +46,7 @@ export function NicknameDialog({ open, onClose, current }: NicknameDialogProps) 
     }
     setSaving(true);
     try {
-      await updateNickname(value.trim() || null);
+      await updateNickname(normalizeNickname(value) ?? '');
       onClose();
     } catch (err) {
       setError(

@@ -5,12 +5,18 @@ import { setServicesForTests, type GuestSession, type Services } from '../servic
 import { createMemoryStorage, createMockServices } from '../services/mock';
 import { useConnectionStore } from '../stores/connection';
 import { useSessionStore } from '../stores/session';
-import { ensureSession, resetSessionForTests } from './bootstrap';
+import {
+  ensureSession,
+  resetSessionForTests,
+  retryConnection,
+  updateNickname,
+  withSession,
+} from './bootstrap';
 import { validateNickname } from './NicknameDialog';
 import { guestDisplayName, SessionBar } from './SessionBar';
 
-function mockServices(): Services {
-  return createMockServices({ latencyMs: 0, sessionStorage: createMemoryStorage() });
+function mockServices(sessionStorage = createMemoryStorage()): Services {
+  return createMockServices({ latencyMs: 0, sessionStorage });
 }
 
 beforeEach(() => {
@@ -62,17 +68,64 @@ describe('ensureSession', () => {
   });
 });
 
+describe('expired session (UC-01 trigger, UC-02 E1)', () => {
+  it('creates a new session, reconnects and retries the call', async () => {
+    const storage = createMemoryStorage();
+    const services = mockServices(storage);
+    const connect = vi.spyOn(services, 'connect');
+    setServicesForTests(services);
+    await ensureSession();
+    const oldId = useSessionStore.getState().session?.guestId;
+
+    storage.removeItem('xq.mock.session');
+    await updateNickname('Tướng');
+
+    expect(useSessionStore.getState()).toMatchObject({ status: 'ready' });
+    expect(useSessionStore.getState().session).toMatchObject({ nickname: 'Tướng' });
+    expect(useSessionStore.getState().session?.guestId).not.toBe(oldId);
+    expect(connect).toHaveBeenCalledTimes(2);
+  });
+
+  it('rethrows a real ACCESS_DENIED without a new session or reconnect', async () => {
+    const services = mockServices();
+    const connect = vi.spyOn(services, 'connect');
+    setServicesForTests(services);
+    await ensureSession();
+    const denied = new ApiRequestError({ code: 'ACCESS_DENIED', message: 'Not the host' });
+    const call = vi.fn().mockRejectedValue(denied);
+
+    await expect(withSession(call)).rejects.toBe(denied);
+    expect(call).toHaveBeenCalledOnce();
+    expect(connect).toHaveBeenCalledOnce();
+  });
+
+  it('retryConnection creates the session first when there is none', async () => {
+    const services = mockServices();
+    const bootstrap = vi.spyOn(services.session, 'bootstrap');
+    setServicesForTests(services);
+    retryConnection();
+    await waitFor(() => expect(useSessionStore.getState().status).toBe('ready'));
+    expect(bootstrap).toHaveBeenCalledOnce();
+  });
+});
+
 describe('nickname', () => {
   it('validates length after trimming; empty is allowed', () => {
     expect(validateNickname('')).toBe('');
     expect(validateNickname('   ')).toBe('');
     expect(validateNickname('a')).not.toBe('');
     expect(validateNickname(' ab ')).toBe('');
-    expect(validateNickname('x'.repeat(33))).not.toBe('');
+    expect(validateNickname('x'.repeat(20))).toBe('');
+    expect(validateNickname('x'.repeat(21))).not.toBe('');
   });
 
   it('shows "Khách" + a tag when there is no nickname', () => {
-    const s: GuestSession = { guestId: 'ab12cd34-0000', nickname: null, isNew: false };
+    const s: GuestSession = {
+      guestId: 'ab12cd34-0000',
+      nickname: null,
+      expiresAt: '2026-12-25T00:00:00.000Z',
+      isNew: false,
+    };
     expect(guestDisplayName(s)).toBe('Khách AB12');
     expect(guestDisplayName({ ...s, nickname: 'Tướng' })).toBe('Tướng');
   });
@@ -100,7 +153,7 @@ describe('SessionBar', () => {
     fireEvent.change(await screen.findByLabelText('Biệt danh'), { target: { value: 'a' } });
     fireEvent.click(screen.getByRole('button', { name: 'Lưu' }));
     expect(screen.getByRole('dialog')).toBeTruthy();
-    expect(screen.getByText(/Biệt danh dài từ 2 đến 32 ký tự/)).toBeTruthy();
+    expect(screen.getByText(/Biệt danh dài từ 2 đến 20 ký tự/)).toBeTruthy();
   });
 
   it('shows a retry button when the session cannot be created', async () => {

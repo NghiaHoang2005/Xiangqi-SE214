@@ -35,10 +35,10 @@ export function getSocket(): Socket {
 
 export function connectSocket(): void {
   const s = getSocket();
-  if (!s.connected) {
-    useConnectionStore.getState().setStatus('connecting');
-    s.connect();
-  }
+  // The handshake authenticates from the cookie, so a renewed session needs a new handshake.
+  if (s.connected) s.disconnect();
+  useConnectionStore.getState().setStatus('connecting');
+  s.connect();
 }
 
 /**

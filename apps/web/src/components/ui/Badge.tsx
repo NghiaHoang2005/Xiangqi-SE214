@@ -1,13 +1,8 @@
-/**
- * Badge component — US-07, SCRUM-129.
- * State is never conveyed by colour alone: a dot + text are always rendered (NFR-16).
- * Variants: neutral | success | warning | danger.
- */
 import type { HTMLAttributes, ReactNode } from 'react';
 
 export type BadgeVariant = 'neutral' | 'success' | 'warning' | 'danger';
 
-/** Pre-built icons that satisfy NFR-16 (no colour-only state). */
+// NFR-16: state is shown by an icon + text, never by colour alone.
 const ICONS: Record<BadgeVariant, string> = {
   neutral: '●',
   success: '✓',

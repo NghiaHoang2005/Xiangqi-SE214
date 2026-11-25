@@ -1,15 +1,16 @@
-import { ErrorCode } from '@xiangqi/shared';
 import {
+  ErrorCode,
+  GUEST_SESSION_IDLE_DAYS,
+  isValidNickname,
   NICKNAME_MAX_LENGTH,
   NICKNAME_MIN_LENGTH,
-  type GuestSession,
-  type SessionService,
-} from '../types';
+  normalizeNickname,
+} from '@xiangqi/shared';
+import type { GuestSession, SessionService } from '../types';
 import { delay, fail, readJson, writeJson, type KeyValueStorage } from './util';
 
 export const MOCK_SESSION_KEY = 'xq.mock.session';
-/** US-11: a session expires after 30 days without activity. */
-export const MOCK_SESSION_IDLE_MS = 30 * 24 * 60 * 60 * 1000;
+export const MOCK_SESSION_IDLE_MS = GUEST_SESSION_IDLE_DAYS * 24 * 60 * 60 * 1000;
 
 export interface StoredSession {
   guestId: string;
@@ -17,10 +18,6 @@ export interface StoredSession {
   lastSeenAt: number;
 }
 
-/**
- * Plays the role of the session cookie. Kept per tab (sessionStorage) on purpose,
- * so two tabs are two different guests.
- */
 export function createMockSessionService(opts: {
   storage: KeyValueStorage;
   latencyMs: number;
@@ -32,8 +29,16 @@ export function createMockSessionService(opts: {
     return readJson<StoredSession>(opts.storage, MOCK_SESSION_KEY);
   }
 
-  function save(s: StoredSession): void {
-    writeJson(opts.storage, MOCK_SESSION_KEY, s);
+  // CFG-07: every request extends the session, like the server does.
+  function touch(s: Omit<StoredSession, 'lastSeenAt'>, isNew: boolean): GuestSession {
+    const lastSeenAt = now();
+    writeJson(opts.storage, MOCK_SESSION_KEY, { ...s, lastSeenAt });
+    return {
+      guestId: s.guestId,
+      nickname: s.nickname,
+      expiresAt: new Date(lastSeenAt + MOCK_SESSION_IDLE_MS).toISOString(),
+      isNew,
+    };
   }
 
   return {
@@ -43,35 +48,26 @@ export function createMockSessionService(opts: {
       await delay(opts.latencyMs);
       const existing = current();
       if (existing && now() - existing.lastSeenAt < MOCK_SESSION_IDLE_MS) {
-        save({ ...existing, lastSeenAt: now() });
-        return { guestId: existing.guestId, nickname: existing.nickname, isNew: false };
+        return touch(existing, false);
       }
-      // Random UUID: guest ids are never sequential.
-      const created: StoredSession = {
-        guestId: crypto.randomUUID(),
-        nickname: null,
-        lastSeenAt: now(),
-      };
-      save(created);
-      return { guestId: created.guestId, nickname: null, isNew: true };
+      return touch({ guestId: crypto.randomUUID(), nickname: null }, true);
     },
 
-    async setNickname(nickname: string | null): Promise<GuestSession> {
+    async setNickname(raw: string): Promise<GuestSession> {
       await delay(opts.latencyMs);
       const existing = current();
-      if (!existing) fail(ErrorCode.ACCESS_DENIED, 'No guest session');
-      const value = nickname?.trim() || null;
-      if (
-        value !== null &&
-        (value.length < NICKNAME_MIN_LENGTH || value.length > NICKNAME_MAX_LENGTH)
-      ) {
+      if (!existing || now() - existing.lastSeenAt >= MOCK_SESSION_IDLE_MS) {
+        fail(ErrorCode.ACCESS_DENIED, 'No guest session');
+      }
+      const nickname = normalizeNickname(raw);
+      if (nickname !== null && !isValidNickname(nickname)) {
         fail(
           ErrorCode.VALIDATION_FAILED,
           `nickname must be ${NICKNAME_MIN_LENGTH}-${NICKNAME_MAX_LENGTH} characters`,
+          { field: 'nickname' },
         );
       }
-      save({ ...existing, nickname: value, lastSeenAt: now() });
-      return { guestId: existing.guestId, nickname: value, isNew: false };
+      return touch({ ...existing, nickname }, false);
     },
   };
 }

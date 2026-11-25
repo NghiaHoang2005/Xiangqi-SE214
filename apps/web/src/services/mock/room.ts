@@ -1,19 +1,25 @@
-import { ErrorCode, ROOM_IDLE_TTL_MS, TIME_CONTROL_PRESETS, type Side } from '@xiangqi/shared';
-import type {
-  CreateRoomInput,
-  JoinRoomResult,
-  MatchStartedEvent,
-  RoomService,
-  RoomSnapshot,
-  SeatInfo,
-} from '../types';
+import { INITIAL_FEN } from '@xiangqi/rules';
+import {
+  ErrorCode,
+  isTimeControlPreset,
+  normalizeJoinCode,
+  ROOM_IDLE_TTL_MS,
+  SIDE_PREFERENCES,
+  SIDES,
+  TIME_CONTROL_PRESETS,
+  type MatchStartedPayload,
+  type RoomView,
+  type SeatView,
+  type Side,
+} from '@xiangqi/shared';
+import type { CreateRoomInput, JoinRoomTarget, RoomService } from '../types';
 import type { MockBus } from './bus';
 import type { StoredSession } from './session';
 import {
   delay,
   fail,
-  randomCode,
-  randomHex,
+  randomBase64Url,
+  randomJoinCode,
   readJson,
   writeJson,
   type KeyValueStorage,
@@ -21,38 +27,33 @@ import {
 
 export const MOCK_ROOMS_KEY = 'xq.mock.rooms';
 
-/** Codes that always answer with an error, to try each error screen by hand. */
+/** Join codes that always fail, to try each error screen by hand. */
 export const MOCK_ERROR_CODES = {
-  /** ROOM_EXPIRED */
-  expired: 'HETHAN00',
-  /** ROOM_FULL */
-  full: 'PHONGDAY',
-  /** NETWORK_ERROR, as if the server could not be reached */
-  network: 'MATKETNO',
+  expired: 'HETHAN99',
+  full: 'PHNGDAY9',
+  network: 'MATKETN9',
 } as const;
 
-const SIDES: readonly string[] = ['RED', 'BLACK', 'RANDOM'];
-
-interface StoredRoom extends RoomSnapshot {
+export interface StoredRoom extends Omit<RoomView, 'yourSide' | 'expiresAt'> {
   lastActivityAt: number;
 }
+
+export type MockEvent =
+  | { type: 'RoomUpdated'; room: StoredRoom }
+  | { type: 'MatchStarted'; payload: MatchStartedPayload };
 
 type RoomTable = Record<string, StoredRoom>;
 
 export function createMockRoomService(opts: {
-  /** Shared by all tabs (localStorage in the browser). */
   storage: KeyValueStorage;
-  bus: MockBus<MatchStartedEvent>;
+  bus: MockBus<MockEvent>;
   currentGuest: () => StoredSession | null;
   latencyMs: number;
   now?: () => number;
 }): RoomService {
   const now = opts.now ?? Date.now;
 
-  /**
-   * Read-modify-write of the shared table. Web Locks (when present) serialise it across
-   * tabs, which is what makes "two guests join at once" give one ROOM_FULL, not three seats.
-   */
+  // Web Locks serialise this across tabs, so two concurrent joins cannot both take the last seat.
   async function withRooms<T>(fn: (rooms: RoomTable) => T): Promise<T> {
     const run = () => {
       const rooms = readJson<RoomTable>(opts.storage, MOCK_ROOMS_KEY) ?? {};
@@ -70,117 +71,178 @@ export function createMockRoomService(opts: {
     return guest;
   }
 
-  function seatOf(guest: StoredSession): SeatInfo {
-    return { guestId: guest.guestId, nickname: guest.nickname };
+  function seatOf(guest: StoredSession, side: Side): SeatView {
+    return { side, guestId: guest.guestId, nickname: guest.nickname, connectionState: 'CONNECTED' };
   }
 
-  function snapshot(room: StoredRoom): RoomSnapshot {
+  function viewFor(room: StoredRoom, guestId: string | undefined): RoomView {
     const copy: Partial<StoredRoom> = structuredClone(room);
     delete copy.lastActivityAt;
-    return copy as RoomSnapshot;
+    return {
+      ...(copy as Omit<StoredRoom, 'lastActivityAt'>),
+      yourSide: room.seats.find((s) => s.guestId === guestId)?.side ?? null,
+      expiresAt: new Date(room.lastActivityAt + ROOM_IDLE_TTL_MS).toISOString(),
+    };
+  }
+
+  function view(room: StoredRoom): RoomView {
+    return viewFor(room, opts.currentGuest()?.guestId);
+  }
+
+  function sortSeats(seats: SeatView[]): SeatView[] {
+    return seats.sort((a, b) => SIDES.indexOf(a.side) - SIDES.indexOf(b.side));
+  }
+
+  function matchStarted(room: StoredRoom, matchId: string): MatchStartedPayload {
+    const player = (side: Side) => {
+      const seat = room.seats.find((s) => s.side === side)!;
+      return { guestId: seat.guestId, nickname: seat.nickname };
+    };
+    const ms = room.timeControl.initialMinutes * 60_000;
+    return {
+      matchId,
+      roomId: room.roomId,
+      mode: 'PVP',
+      version: 0,
+      timeControl: { ...room.timeControl },
+      turn: 'RED',
+      fen: INITIAL_FEN,
+      clocks: { redMs: ms, blackMs: ms },
+      players: { RED: player('RED'), BLACK: player('BLACK') },
+    };
+  }
+
+  function findRoom(rooms: RoomTable, target: JoinRoomTarget): StoredRoom | undefined {
+    if ('roomId' in target) return rooms[target.roomId];
+    const code = normalizeJoinCode(target.joinCode);
+    return Object.values(rooms).find((r) => r.joinCode === code);
   }
 
   return {
-    async createRoom(input: CreateRoomInput): Promise<RoomSnapshot> {
+    async createRoom(input: CreateRoomInput): Promise<RoomView> {
       await delay(opts.latencyMs);
       const guest = requireGuest();
 
-      const validClock = TIME_CONTROL_PRESETS.some(
-        (p) =>
-          p.initialMinutes === input.timeControl?.initialMinutes &&
-          p.incrementSeconds === input.timeControl?.incrementSeconds,
-      );
-      if (!validClock || !SIDES.includes(input.side)) {
+      if (!isTimeControlPreset(input.timeControl)) {
         const clocks = TIME_CONTROL_PRESETS.map(
           (p) => `${p.initialMinutes}+${p.incrementSeconds}`,
         ).join(', ');
+        fail(ErrorCode.VALIDATION_FAILED, `Invalid timeControl. Allowed: ${clocks}`, {
+          field: 'timeControl',
+          allowed: TIME_CONTROL_PRESETS,
+        });
+      }
+      if (!SIDE_PREFERENCES.includes(input.preferredSide)) {
         fail(
           ErrorCode.VALIDATION_FAILED,
-          `Invalid room config. timeControl: ${clocks}; side: ${SIDES.join(', ')}`,
+          `Invalid preferredSide. Allowed: ${SIDE_PREFERENCES.join(', ')}`,
+          { field: 'preferredSide', allowed: SIDE_PREFERENCES },
         );
       }
 
-      const side: Side =
-        input.side === 'RANDOM' ? (Math.random() < 0.5 ? 'RED' : 'BLACK') : input.side;
-      const room: StoredRoom = {
-        roomId: randomHex(16), // 128 bits
-        code: randomCode(8),
-        hostGuestId: guest.guestId,
-        timeControl: { ...input.timeControl },
-        seats: { RED: null, BLACK: null, [side]: seatOf(guest) },
-        status: 'WAITING',
-        matchId: null,
-        lastActivityAt: now(),
-      };
-      await withRooms((rooms) => {
-        rooms[room.roomId] = room;
+      const hostSide: Side =
+        input.preferredSide === 'RANDOM'
+          ? Math.random() < 0.5
+            ? 'RED'
+            : 'BLACK'
+          : input.preferredSide;
+      const room = await withRooms((rooms) => {
+        const codes = new Set(Object.values(rooms).map((r) => r.joinCode));
+        let joinCode = randomJoinCode();
+        while (codes.has(joinCode)) joinCode = randomJoinCode();
+        const created: StoredRoom = {
+          roomId: randomBase64Url(32),
+          joinCode,
+          status: 'WAITING',
+          timeControl: { ...input.timeControl },
+          hostGuestId: guest.guestId,
+          hostSide,
+          seats: [seatOf(guest, hostSide)],
+          matchId: null,
+          lastActivityAt: now(),
+        };
+        rooms[created.roomId] = created;
+        return created;
       });
-      return snapshot(room);
+      return view(room);
     },
 
-    async joinRoom(roomIdOrCode: string): Promise<JoinRoomResult> {
+    async joinRoom(target: JoinRoomTarget): Promise<RoomView> {
       await delay(opts.latencyMs);
-      const key = roomIdOrCode.trim();
-      const upper = key.toUpperCase();
-      if (upper === MOCK_ERROR_CODES.network) fail('NETWORK_ERROR', 'Cannot reach the server');
-      if (upper === MOCK_ERROR_CODES.expired) fail(ErrorCode.ROOM_EXPIRED, 'Room has expired');
-      if (upper === MOCK_ERROR_CODES.full) fail(ErrorCode.ROOM_FULL, 'Room is full');
+      if ('joinCode' in target) {
+        const code = normalizeJoinCode(target.joinCode);
+        if (code === MOCK_ERROR_CODES.network) fail('NETWORK_ERROR', 'Cannot reach the server');
+        if (code === MOCK_ERROR_CODES.expired) fail(ErrorCode.ROOM_EXPIRED, 'Room has expired');
+        if (code === MOCK_ERROR_CODES.full) fail(ErrorCode.ROOM_FULL, 'Room is full');
+      }
       const guest = requireGuest();
 
-      const { result, started } = await withRooms((rooms) => {
-        const room = rooms[key] ?? Object.values(rooms).find((r) => r.code === upper);
+      const { room, started } = await withRooms((rooms) => {
+        const room = findRoom(rooms, target);
         if (!room) fail(ErrorCode.ROOM_NOT_FOUND, 'Room not found');
-        if (room.status === 'CLOSED' || now() - room.lastActivityAt > ROOM_IDLE_TTL_MS) {
+        if (
+          room.status === 'CLOSED' ||
+          room.status === 'EXPIRED' ||
+          now() - room.lastActivityAt > ROOM_IDLE_TTL_MS
+        ) {
           fail(ErrorCode.ROOM_EXPIRED, 'Room has expired');
         }
 
         // A1: a guest who already holds a seat gets the same seat back.
-        const held = (['RED', 'BLACK'] as const).find(
-          (s) => room.seats[s]?.guestId === guest.guestId,
-        );
-        if (held) {
+        if (room.seats.some((s) => s.guestId === guest.guestId)) {
           room.lastActivityAt = now();
-          return { result: { room: snapshot(room), seat: held }, started: null };
+          return { room, started: null };
         }
 
-        const free = (['RED', 'BLACK'] as const).find((s) => room.seats[s] === null);
+        const free = SIDES.find((side) => !room.seats.some((s) => s.side === side));
         if (!free) fail(ErrorCode.ROOM_FULL, 'Room is full');
 
-        room.seats[free] = seatOf(guest);
+        room.seats = sortSeats([...room.seats, seatOf(guest, free)]);
         room.lastActivityAt = now();
-        let event: MatchStartedEvent | null = null;
-        if (room.seats.RED && room.seats.BLACK) {
-          room.status = 'PLAYING';
+        let event: MatchStartedPayload | null = null;
+        if (room.seats.length === SIDES.length) {
+          room.status = 'STARTED';
           room.matchId = crypto.randomUUID();
-          event = {
-            roomId: room.roomId,
-            matchId: room.matchId,
-            version: 0,
-            red: room.seats.RED,
-            black: room.seats.BLACK,
-          };
+          event = matchStarted(room, room.matchId);
         }
-        return { result: { room: snapshot(room), seat: free }, started: event };
+        return { room, started: event };
       });
 
-      if (started) opts.bus.publish(started);
-      return result;
+      if (started) {
+        opts.bus.publish({ type: 'RoomUpdated', room });
+        opts.bus.publish({ type: 'MatchStarted', payload: started });
+      }
+      return view(room);
     },
 
-    async closeRoom(roomId: string): Promise<void> {
+    async closeRoom(roomId: string): Promise<RoomView> {
       await delay(opts.latencyMs);
       const guest = requireGuest();
-      await withRooms((rooms) => {
+      const room = await withRooms((rooms) => {
         const room = rooms[roomId];
         if (!room) fail(ErrorCode.ROOM_NOT_FOUND, 'Room not found');
         if (room.hostGuestId !== guest.guestId) fail(ErrorCode.ACCESS_DENIED, 'Not the host');
         room.status = 'CLOSED';
+        room.lastActivityAt = now();
+        return room;
+      });
+      opts.bus.publish({ type: 'RoomUpdated', room });
+      return view(room);
+    },
+
+    onRoomUpdated(roomId, listener) {
+      return opts.bus.subscribe((event) => {
+        if (event.type === 'RoomUpdated' && event.room.roomId === roomId) {
+          listener(view(event.room));
+        }
       });
     },
 
     onMatchStarted(roomId, listener) {
       return opts.bus.subscribe((event) => {
-        if (event.roomId === roomId) listener(event);
+        if (event.type === 'MatchStarted' && event.payload.roomId === roomId) {
+          listener(event.payload);
+        }
       });
     },
   };
