@@ -1,6 +1,15 @@
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { GUEST_SESSION_COOKIE, SystemEvent, type Ack, type PingResult } from '@xiangqi/shared';
+import {
+  ClientEvent,
+  GUEST_SESSION_COOKIE,
+  ServerEvent,
+  SystemEvent,
+  isValidJoinCode,
+  type Ack,
+  type PingResult,
+  type RoomView,
+} from '@xiangqi/shared';
 import { createHash } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 import { io, type Socket } from 'socket.io-client';
@@ -10,9 +19,26 @@ import { configureApp } from './bootstrap';
 import { PrismaService } from './database/prisma.service';
 import { TEST_DATABASE_URL, hasTestDb, resetTestDatabase } from './test/test-db';
 
-describe.skipIf(!hasTestDb)('server skeleton (e2e)', () => {
+describe.skipIf(!hasTestDb)('server (e2e)', () => {
   let app: INestApplication;
   let baseUrl: string;
+
+  async function connectGuest(nickname: string) {
+    const response = await fetch(`${baseUrl}/api/guest-session`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ nickname }),
+    });
+    expect(response.status).toBe(201);
+    const { guestId } = await response.json();
+    const cookie = response.headers.get('set-cookie')?.split(';')[0] ?? '';
+    const socket = io(baseUrl, {
+      transports: ['websocket'],
+      reconnection: false,
+      extraHeaders: { cookie },
+    });
+    return { guestId, socket };
+  }
 
   beforeAll(async () => {
     await (await resetTestDatabase()).$disconnect();
@@ -141,5 +167,73 @@ describe.skipIf(!hasTestDb)('server skeleton (e2e)', () => {
     const missing = await fetch(`${baseUrl}/api/guest-session/me`);
     expect(missing.status).toBe(401);
     expect(await missing.json()).toMatchObject({ code: 'ACCESS_DENIED' });
+  });
+
+  it('creates a private room, persists the host seat and only allows the host to close it', async () => {
+    const host = await connectGuest('Room host');
+    const other = await connectGuest('Other guest');
+    const anonymous = io(baseUrl, { transports: ['websocket'], reconnection: false });
+    const timeControl = { initialMinutes: 10, incrementSeconds: 5 };
+    try {
+      const denied = await anonymous.timeout(2000).emitWithAck(ClientEvent.CreateRoom, {
+        timeControl,
+        preferredSide: 'BLACK',
+      });
+      expect(denied).toMatchObject({ ok: false, error: { code: 'ACCESS_DENIED' } });
+
+      const invalid = await host.socket.timeout(2000).emitWithAck(ClientEvent.CreateRoom, {
+        timeControl: { initialMinutes: 7, incrementSeconds: 0 },
+        preferredSide: 'RED',
+      });
+      expect(invalid).toMatchObject({
+        ok: false,
+        error: {
+          code: 'VALIDATION_FAILED',
+          details: { field: 'timeControl', allowed: expect.any(Array) },
+        },
+      });
+
+      const created: Ack<RoomView> = await host.socket
+        .timeout(2000)
+        .emitWithAck(ClientEvent.CreateRoom, {
+          timeControl,
+          preferredSide: 'BLACK',
+          requestId: 'create_12345',
+        });
+      expect(created.ok).toBe(true);
+      if (!created.ok) throw new Error('CreateRoom failed');
+      expect(created.requestId).toBe('create_12345');
+      const { roomId, joinCode } = created.data;
+      expect(roomId).toMatch(/^[\w-]{43}$/);
+      expect(isValidJoinCode(joinCode)).toBe(true);
+      expect(created.data).toMatchObject({
+        status: 'WAITING',
+        timeControl,
+        hostGuestId: host.guestId,
+        hostSide: 'BLACK',
+        yourSide: 'BLACK',
+        seats: [{ guestId: host.guestId, side: 'BLACK', connectionState: 'CONNECTED' }],
+        matchId: null,
+      });
+      const seat = await app.get(PrismaService).roomSeat.findUnique({
+        where: { roomId_side: { roomId, side: 'BLACK' } },
+      });
+      expect(seat?.guestId).toBe(host.guestId);
+
+      const forbidden = await other.socket
+        .timeout(2000)
+        .emitWithAck(ClientEvent.CloseRoom, { roomId });
+      expect(forbidden).toMatchObject({ ok: false, error: { code: 'ACCESS_DENIED' } });
+      const update = new Promise<RoomView>((resolve) =>
+        host.socket.once(ServerEvent.RoomUpdated, resolve),
+      );
+      const closed = await host.socket.timeout(2000).emitWithAck(ClientEvent.CloseRoom, { roomId });
+      expect(closed).toMatchObject({ ok: true, data: { roomId, status: 'CLOSED' } });
+      await expect(update).resolves.toMatchObject({ roomId, status: 'CLOSED', yourSide: 'BLACK' });
+    } finally {
+      host.socket.close();
+      other.socket.close();
+      anonymous.close();
+    }
   });
 });
