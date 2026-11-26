@@ -15,6 +15,9 @@
   --warn-bg: #fff8e1;
   --danger: #ba1a1a;
   --danger-bg: #fdecea;
+  --surface-muted: #f4f4f1;
+  --accent-soft: rgba(255, 218, 214, 0.2);
+  --piece-red: #991b1b;
 
   /* Typography */
   font-family:
@@ -917,50 +920,115 @@ a:focus-visible {
   }
 }
 
-/* ─── Create room (US-13) ───────────────────────────────── */
-.create-room-card {
+/* ─── Create room (SCRUM-144) ──────────────────────────── */
+.create-room {
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
-  margin-top: var(--space-4);
-  padding: var(--space-6);
-  background: var(--surface);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
-.choice-group {
-  margin: 0;
-  padding: 0;
+.create-room-back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px var(--space-3);
   border: none;
-  min-width: 0;
+  border-radius: 8px; /* Figma radius for small controls; no token */
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  color: var(--muted);
+  font: 600 14px/20px var(--font-sans);
+  cursor: pointer;
 }
 
-.choice-group legend {
-  margin-bottom: var(--space-3);
+.create-room-back:hover {
+  color: var(--fg);
+}
+
+.create-room-title {
+  margin: 0;
   font-family: var(--font-serif);
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 700;
+  letter-spacing: -0.6px;
+}
+
+.create-room-lead {
+  margin: var(--space-2) 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.create-room-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.create-room-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.create-room-card {
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-6);
+  border: none;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.create-room-card > * + * {
+  margin-top: var(--space-4);
+}
+
+/* Floated so the legend sits inside the card instead of on its top edge. */
+.create-room-card-title {
+  float: left;
+  width: 100%;
+  padding: 0;
+  font-family: var(--font-serif);
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 700;
+}
+
+.create-room-card > .create-room-card-desc {
+  clear: both;
+  margin: 0;
+  padding-top: 2px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 20px;
 }
 
 .choice-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
   gap: var(--space-3);
 }
 
-.choice-grid-3 {
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+.choice-list {
+  display: grid;
+  gap: var(--space-3);
 }
 
 .choice {
   position: relative;
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 56px;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid transparent;
+  border-radius: 8px; /* Figma option radius; no token */
+  background: var(--surface-muted);
   cursor: pointer;
   transition:
     border-color 0.15s,
@@ -970,20 +1038,20 @@ a:focus-visible {
 /* Visually hidden but still focusable and announced as a radio. */
 .choice input {
   position: absolute;
-  opacity: 0;
   inset: 0;
   margin: 0;
+  opacity: 0;
   cursor: pointer;
 }
 
 .choice:hover {
-  border-color: var(--accent);
+  border-color: var(--line);
 }
 
 .choice:has(input:checked) {
   border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
-  box-shadow: inset 0 0 0 1px var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .choice:has(input:focus-visible) {
@@ -996,17 +1064,90 @@ a:focus-visible {
   cursor: not-allowed;
 }
 
+.choice-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .choice-main {
+  font-size: 14px;
+  line-height: 20px;
   font-weight: 600;
 }
 
 .choice-sub {
-  font-size: 0.85rem;
   color: var(--muted);
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 500;
+}
+
+.choice:has(input:checked) .choice-sub {
+  color: var(--accent);
+}
+
+.choice-check {
+  flex-shrink: 0;
+  visibility: hidden;
+}
+
+.choice:has(input:checked) .choice-check {
+  visibility: visible;
+}
+
+.side-dot {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+}
+
+.side-dot-red {
+  background: var(--piece-red);
+}
+
+.side-dot-black {
+  background: var(--fg);
+}
+
+.side-dot-random {
+  background: linear-gradient(90deg, var(--piece-red) 50%, var(--fg) 50%);
+}
+
+.create-room-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: var(--space-4) 0 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--surface-muted);
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.create-room-note img {
+  flex-shrink: 0;
+}
+
+.create-room-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-4);
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
 }
 
 .create-room-feedback {
-  min-height: 1.5em;
+  flex: 1;
+  min-width: 200px;
 }
 
 .create-room-feedback p {
@@ -1017,8 +1158,16 @@ a:focus-visible {
   color: var(--danger);
 }
 
-.create-room-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-3);
+@media (max-width: 480px) {
+  .create-room-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .create-room-card {
+    padding: var(--space-4);
+  }
+
+  .create-room-actions .btn {
+    width: 100%;
+  }
 }

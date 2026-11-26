@@ -54,23 +54,34 @@ describe('CreateRoomPage', () => {
       '15+0',
       '15+5',
     ]);
-    expect((screen.getByRole('radio', { name: /10\+5/ }) as HTMLInputElement).checked).toBe(true);
-    expect((screen.getByRole('radio', { name: /Đỏ/ }) as HTMLInputElement).checked).toBe(true);
-    expect(screen.getByRole('radio', { name: 'Đen' })).toBeTruthy();
-    expect(screen.getByRole('radio', { name: 'Ngẫu nhiên' })).toBeTruthy();
+    expect(
+      (screen.getByRole('radio', { name: /10 phút \| \+5s/ }) as HTMLInputElement).checked,
+    ).toBe(true);
+    expect((screen.getByRole('radio', { name: /^Đỏ/ }) as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByRole('radio', { name: /^Đen/ })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: /^Ngẫu nhiên/ })).toBeTruthy();
+  });
+
+  it('describes the chosen clock below the options', () => {
+    renderPage();
+    expect(screen.getByText(/10 phút suy nghĩ chính, cộng thêm 5 giây/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('radio', { name: /^5 phút \| \+0s/ }));
+    expect(
+      screen.getByText(/Mỗi bên có 5 phút suy nghĩ chính, không cộng thêm thời gian/),
+    ).toBeTruthy();
   });
 
   it('creates the room with the chosen config and opens the room page', async () => {
     const create = vi.spyOn(services.room, 'createRoom');
     renderPage();
-    fireEvent.click(screen.getByRole('radio', { name: /15\+0/ }));
-    fireEvent.click(screen.getByRole('radio', { name: 'Ngẫu nhiên' }));
+    fireEvent.click(screen.getByRole('radio', { name: /15 phút \| \+0s/ }));
+    fireEvent.click(screen.getByRole('radio', { name: /^Ngẫu nhiên/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Tạo phòng' }));
 
     await waitFor(() => expect(mockNavigate).toHaveBeenCalledOnce());
     expect(create).toHaveBeenCalledWith({
       timeControl: { initialMinutes: 15, incrementSeconds: 0 },
-      side: 'RANDOM',
+      preferredSide: 'RANDOM',
     });
     const room = await create.mock.results[0].value;
     expect(mockNavigate).toHaveBeenCalledWith(`/room/${room.roomId}`, { state: { room } });
