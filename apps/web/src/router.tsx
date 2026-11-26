@@ -2,6 +2,7 @@ import { createBrowserRouter, type RouteObject } from 'react-router-dom';
 import { AppLayout } from './layout/AppLayout';
 import {
   AiSetupPage,
+  CreateRoomPage,
   HistoryPage,
   HomePage,
   LeaderboardPage,
@@ -19,6 +20,8 @@ export const routes: RouteObject[] = [
     element: <AppLayout />,
     children: [
       { path: paths.home, element: <HomePage /> },
+      // Static segment outranks :roomId in React Router, so "new" never reaches RoomPage.
+      { path: paths.createRoom, element: <CreateRoomPage /> },
       { path: paths.room(), element: <RoomPage /> },
       { path: paths.aiSetup, element: <AiSetupPage /> },
       { path: paths.match(), element: <MatchPage /> },

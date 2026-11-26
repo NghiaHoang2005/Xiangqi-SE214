@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactElement } from 'react';
+import { type CSSProperties, type ReactElement, useId } from 'react';
 import {
   BOARD_FILES,
   BOARD_RANKS,
@@ -138,6 +138,10 @@ export function XiangqiBoard({
   className = '',
   id,
 }: XiangqiBoardProps): ReactElement {
+  // SVG ids are document-global: two boards on one page must not share gradients.
+  const uid = useId().replace(/:/g, '');
+  const boardGradientId = `board-wood-gradient-${uid}`;
+  const pieceGradientId = `piece-wood-gradient-${uid}`;
   const files = Array.from({ length: BOARD_FILES }, (_, i) => i);
   const ranks = Array.from({ length: BOARD_RANKS }, (_, i) => i);
 
@@ -171,6 +175,7 @@ export function XiangqiBoard({
             cx={cx}
             cy={cy}
             radius={16}
+            gradientId={pieceGradientId}
             selected={isSelected}
             isLastMove={isLastMoveSquare}
             onClick={onPieceClick || onSquareClick ? handlePieceClick : undefined}
@@ -198,14 +203,14 @@ export function XiangqiBoard({
       >
         <defs>
           {/* Wood board gradient */}
-          <linearGradient id="board-wood-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <linearGradient id={boardGradientId} x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor="#f3ddb6" />
             <stop offset="50%" stopColor="#edd0a4" />
             <stop offset="100%" stopColor="#e2c191" />
           </linearGradient>
 
           {/* Piece wood gradient */}
-          <radialGradient id="piece-wood-gradient" cx="35%" cy="35%" r="65%">
+          <radialGradient id={pieceGradientId} cx="35%" cy="35%" r="65%">
             <stop offset="0%" stopColor="#ffffff" />
             <stop offset="50%" stopColor="#fbf3df" />
             <stop offset="100%" stopColor="#e8cf9f" />
@@ -219,7 +224,7 @@ export function XiangqiBoard({
           width={BOARD_WIDTH}
           height={BOARD_HEIGHT}
           rx="10"
-          fill="url(#board-wood-gradient)"
+          fill={`url(#${boardGradientId})`}
         />
 
         {/* Outer board border frame */}

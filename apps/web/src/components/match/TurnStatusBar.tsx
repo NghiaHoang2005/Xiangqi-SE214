@@ -1,6 +1,15 @@
 import { Link } from 'react-router-dom';
 import type { Side } from '@xiangqi/shared';
 import { paths } from '../../routes';
+import { useConnectionStore, type ConnectionStatus } from '../../stores/connection';
+
+const CONNECTION_TEXT: Record<ConnectionStatus, string> = {
+  idle: 'Chưa kết nối',
+  connecting: 'Đang kết nối',
+  connected: 'Đã kết nối',
+  reconnecting: 'Đang kết nối lại',
+  disconnected: 'Mất kết nối',
+};
 
 export interface TurnStatusBarProps {
   matchCode: string;
@@ -16,12 +25,13 @@ export interface TurnStatusBarProps {
  */
 export function TurnStatusBar({
   matchCode,
-  modeLabel = 'Đấu Trường Xếp Hạng',
+  modeLabel = 'Phòng riêng',
   currentTurn,
   isLive = true,
   onFlipBoard,
 }: TurnStatusBarProps) {
   const turnLabel = currentTurn === 'RED' ? 'Phe Đỏ' : 'Phe Đen';
+  const connection = useConnectionStore((s) => s.status);
 
   return (
     <div className="turn-bar">
@@ -37,7 +47,7 @@ export function TurnStatusBar({
           •
         </span>
         <span className="turn-room-pill">
-          <span className="turn-room-prefix">Phòng </span>#{matchCode}
+          <span className="turn-room-prefix">Trận </span>#{matchCode}
         </span>
       </div>
 
@@ -59,15 +69,6 @@ export function TurnStatusBar({
       </div>
 
       <div className="turn-bar-right">
-        <span className="turn-latency-pill">Độ trễ: 18ms</span>
-        <span className="turn-fairplay-text">
-          Trọng tài AI: <strong>Hợp lệ (Fair Play)</strong>
-        </span>
-
-        {/* Mobile header actions matching Figma Mobile 04. Match */}
-        <span className="turn-mob-icon" aria-hidden="true" title="Âm thanh">
-          🔊
-        </span>
         {onFlipBoard && (
           <button
             type="button"
@@ -79,10 +80,12 @@ export function TurnStatusBar({
             ⇅
           </button>
         )}
-        <span className="turn-mob-conn-dot" aria-hidden="true" title="Đã kết nối" />
-        <span className="turn-mob-avatar" aria-hidden="true">
-          👤
-        </span>
+        <span
+          className={`turn-mob-conn-dot is-${connection}`}
+          role="img"
+          aria-label={CONNECTION_TEXT[connection]}
+          title={CONNECTION_TEXT[connection]}
+        />
       </div>
     </div>
   );

@@ -12,7 +12,10 @@ describe('PieceToken', () => {
       </svg>,
     );
 
-    const token = screen.getByRole('button', { name: PIECE_NAMES_VI.RED.GENERAL });
+    // Not clickable: a labelled image, not a button nobody can press.
+    const token = screen.getByRole('img', { name: PIECE_NAMES_VI.RED.GENERAL });
+    expect(screen.queryByRole('button')).toBeNull();
+    expect(token.getAttribute('tabindex')).toBeNull();
     expect(token).toBeTruthy();
     expect(token.getAttribute('class')).toContain('is-red');
     expect(screen.getByText(PIECE_CHARACTERS.RED.GENERAL)).toBeTruthy();
@@ -25,7 +28,7 @@ describe('PieceToken', () => {
       </svg>,
     );
 
-    const token = screen.getByRole('button', { name: PIECE_NAMES_VI.BLACK.GENERAL });
+    const token = screen.getByRole('img', { name: PIECE_NAMES_VI.BLACK.GENERAL });
     expect(token).toBeTruthy();
     expect(token.getAttribute('class')).toContain('is-black');
     expect(screen.getByText(PIECE_CHARACTERS.BLACK.GENERAL)).toBeTruthy();
@@ -58,7 +61,13 @@ describe('PieceToken', () => {
   it('applies selection styling and aria-pressed state', () => {
     const { container } = render(
       <svg>
-        <PieceToken piece={{ type: 'SOLDIER', side: 'RED' }} cx={50} cy={50} selected={true} />
+        <PieceToken
+          piece={{ type: 'SOLDIER', side: 'RED' }}
+          cx={50}
+          cy={50}
+          selected={true}
+          onClick={() => {}}
+        />
       </svg>,
     );
 

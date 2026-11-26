@@ -34,6 +34,14 @@ pnpm dev                   # server on :3000, web on :5173 (web proxies /api and
 
 Open http://localhost:5173. After changing code in `packages/*`, run `pnpm build` again (or `pnpm --filter @xiangqi/rules build`).
 
+### Frontend without the backend
+
+`pnpm --filter @xiangqi/web dev:mock` runs the web app against a mock backend in the browser (`apps/web/src/services/mock`), so FE work does not wait for the server. Pages call the interfaces in `apps/web/src/services/types.ts`; the real implementation is `services/real`.
+
+- Each tab is its own guest. Create a room in one tab and join it with the code in another: both get `MatchStarted`.
+- Room codes `HETHAN99`, `PHNGDAY9` and `MATKETN9` always answer `ROOM_EXPIRED`, `ROOM_FULL` and `NETWORK_ERROR`.
+- Clear the mock data with `localStorage.clear(); sessionStorage.clear()` in the browser console.
+
 ## Run the full stack with Docker (demo)
 
 ```bash

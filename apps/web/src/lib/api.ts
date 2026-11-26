@@ -8,11 +8,15 @@ function isApiError(body: unknown): body is ApiError {
   return typeof body === 'object' && body !== null && 'code' in body && 'message' in body;
 }
 
-/**
- * JSON fetch against the backend (`/api/...`, proxied by Vite in dev and nginx in Docker).
- * Sends cookies, tags the request with an x-request-id, and throws ApiRequestError on failure.
- */
+/** Throws ApiRequestError on failure. */
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  return (await apiRequest<T>(path, init)).data;
+}
+
+export async function apiRequest<T>(
+  path: string,
+  init: RequestInit = {},
+): Promise<{ status: number; data: T }> {
   const requestId = newRequestId();
   const headers = new Headers(init.headers);
   headers.set(REQUEST_ID_HEADER, requestId);
@@ -34,5 +38,5 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
       : { code: 'INTERNAL_ERROR' as const, message: `HTTP ${res.status}`, requestId };
     throw new ApiRequestError(error, res.status);
   }
-  return body as T;
+  return { status: res.status, data: body as T };
 }

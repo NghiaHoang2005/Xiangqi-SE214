@@ -1,15 +1,25 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { afterEach, describe, expect, it } from 'vitest';
+import { useConnectionStore } from '../stores/connection';
 import { MatchPage } from './MatchPage';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  useConnectionStore.setState({ status: 'idle' });
+});
 
-function renderMatch(path = '/match/M-9821') {
+const MATCH_ID = 'eedb11a5-a275-4fff-87b0-2ee5934477d7';
+
+function renderMatch(path = `/match/${MATCH_ID}`) {
   const router = createMemoryRouter([{ path: '/match/:matchId', element: <MatchPage /> }], {
     initialEntries: [path],
   });
   return render(<RouterProvider router={router} future={{ v7_startTransition: true }} />);
+}
+
+function panels(container: HTMLElement) {
+  return [...container.querySelectorAll<HTMLElement>('.player-panel')];
 }
 
 describe('MatchPage', () => {
@@ -17,77 +27,85 @@ describe('MatchPage', () => {
     renderMatch();
 
     expect(screen.getByRole('heading', { level: 1, name: 'Bàn đấu' })).toBeTruthy();
-    expect(screen.getByText('#M-9821')).toBeTruthy();
-    expect(screen.getByText('Trần Minh Quân')).toBeTruthy();
+    expect(screen.getByText(`#${MATCH_ID.slice(0, 8)}`)).toBeTruthy();
     expect(screen.getByText('Bạn')).toBeTruthy();
+    expect(screen.getByText('Kỳ thủ Đen')).toBeTruthy();
     expect(screen.getAllByText('Lượt của bạn').length).toBeGreaterThan(0);
   });
 
-  it('swaps top and bottom panels and flips board perspective', () => {
+  it('shows only start-of-game values, not invented stats', () => {
     const { container } = renderMatch();
 
-    const panelsBefore = container.querySelectorAll('.player-panel');
-    expect(panelsBefore[0]?.getAttribute('data-side')).toBe('BLACK');
-    expect(panelsBefore[1]?.getAttribute('data-side')).toBe('RED');
-
-    const boardContainerBefore = container.querySelector('.xiangqi-board-container');
-    expect(boardContainerBefore?.getAttribute('data-orientation')).toBe('RED');
-
-    // 32 pieces rendered
-    expect(screen.getAllByRole('button', { name: /(Đỏ|Đen).+tại cột/i }).length).toBe(32);
-
-    fireEvent.click(screen.getAllByRole('button', { name: /Đảo Góc Nhìn Bàn Cờ/i })[0]!);
-
-    const panelsAfter = container.querySelectorAll('.player-panel');
-    expect(panelsAfter[0]?.getAttribute('data-side')).toBe('RED');
-    expect(panelsAfter[1]?.getAttribute('data-side')).toBe('BLACK');
-
-    const boardContainerAfter = container.querySelector('.xiangqi-board-container');
-    expect(boardContainerAfter?.getAttribute('data-orientation')).toBe('BLACK');
+    expect(screen.getAllByText('10:00')).toHaveLength(2);
+    expect(screen.getByText('Đồng hồ: 10 phút + 5 giây mỗi nước')).toBeTruthy();
+    expect(screen.getByText('0 nước đi')).toBeTruthy();
+    expect(container.textContent).not.toMatch(/Elo|Độ trễ|Fair Play|Xếp Hạng|Thắng \d+%/);
   });
 
-  it('displays turn by text clearly, not by color alone (NFR-16)', () => {
+  it('keeps "you" on your own side when the board is flipped', () => {
+    const { container } = renderMatch();
+
+    const [topBefore, bottomBefore] = panels(container);
+    expect(bottomBefore!.dataset.side).toBe('RED');
+    expect(within(bottomBefore!).getByText('(Kỳ thủ Đỏ)')).toBeTruthy();
+    expect(within(topBefore!).getByText('(Đối thủ)')).toBeTruthy();
+
+    fireEvent.click(screen.getAllByRole('button', { name: /Đảo góc nhìn bàn cờ/ })[0]!);
+
+    const [topAfter, bottomAfter] = panels(container);
+    expect(topAfter!.dataset.side).toBe('RED');
+    expect(within(topAfter!).getByText('(Kỳ thủ Đỏ)')).toBeTruthy();
+    expect(within(bottomAfter!).getByText('(Đối thủ)')).toBeTruthy();
+  });
+
+  it('marks the opponent turn after the turn changes', () => {
+    const { container } = renderMatch();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Đổi lượt (demo)' }));
+
+    const [top, bottom] = panels(container);
+    expect(top!.dataset.active).toBe('true');
+    expect(within(top!).getAllByText('Lượt đối thủ').length).toBeGreaterThan(0);
+    expect(bottom!.dataset.active).toBe('false');
+  });
+
+  it('disables draw and resign until those features exist', () => {
     renderMatch();
 
-    // Turn bar has text
-    expect(screen.getAllByText(/Lượt của bạn/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/Lượt hiện tại:/i)).toBeTruthy();
-    expect(screen.getAllByText(/Phe Đỏ/i).length).toBeGreaterThan(0);
-
-    // Demo turn switch button updates text
-    fireEvent.click(screen.getByRole('button', { name: /Đổi lượt \(demo\)/i }));
-    expect(screen.getAllByText(/Phe Đen/i).length).toBeGreaterThan(0);
+    for (const name of ['Cầu hòa', 'Đầu hàng']) {
+      for (const button of screen.getAllByRole('button', { name })) {
+        expect((button as HTMLButtonElement).disabled).toBe(true);
+      }
+    }
+    expect(screen.queryByRole('button', { name: /Xin thua|Trò chuyện/ })).toBeNull();
   });
 
-  it('allows flipping board perspective from mobile actions bar (NFR-04)', () => {
-    const { container } = renderMatch();
+  it('reports the real socket state instead of a fixed "connected"', () => {
+    useConnectionStore.setState({ status: 'reconnecting' });
+    renderMatch();
 
-    const mobileFlipBtn = screen.getByRole('button', { name: 'Đảo góc nhìn' });
-    expect(mobileFlipBtn).toBeTruthy();
-
-    fireEvent.click(mobileFlipBtn);
-
-    const board = container.querySelector('.xiangqi-board-container');
-    expect(board?.getAttribute('data-orientation')).toBe('BLACK');
+    expect(screen.getByRole('img', { name: 'Đang kết nối lại' })).toBeTruthy();
   });
 
-  it('renders responsive board frame supporting 360px to 1440px without horizontal scroll (NFR-04)', () => {
-    // Test small mobile viewport (360px)
-    window.innerWidth = 360;
+  it('renders the starting position and flips the board with the panels', () => {
     const { container } = renderMatch();
 
-    const page = container.querySelector('.match-page');
-    expect(page).toBeTruthy();
+    const board = () => container.querySelector('.xiangqi-board-container');
+    expect(board()?.getAttribute('data-orientation')).toBe('RED');
+    expect(screen.getAllByRole('button', { name: /(Đỏ|Đen).+tại cột/ })).toHaveLength(32);
 
-    const boardSvg = container.querySelector('.xiangqi-board-svg');
-    expect(boardSvg).toBeTruthy();
-    // SVG viewBox preserves aspect ratio on any viewport from 360px to 1440px
-    expect(boardSvg?.getAttribute('viewBox')).toBe('0 0 360 400');
-    expect(boardSvg?.getAttribute('preserveAspectRatio')).toBe('xMidYMid meet');
+    fireEvent.click(screen.getAllByRole('button', { name: /Đảo góc nhìn bàn cờ/ })[0]!);
+    expect(board()?.getAttribute('data-orientation')).toBe('BLACK');
 
-    // Test desktop viewport (1440px)
-    window.innerWidth = 1440;
-    const desktopLayout = container.querySelector('.match-layout');
-    expect(desktopLayout).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Đảo góc nhìn' }));
+    expect(board()?.getAttribute('data-orientation')).toBe('RED');
+  });
+
+  it('scales the board SVG instead of overflowing on narrow screens (NFR-04)', () => {
+    const { container } = renderMatch();
+
+    const svg = container.querySelector('.xiangqi-board-svg');
+    expect(svg?.getAttribute('viewBox')).toBe('0 0 360 400');
+    expect(svg?.getAttribute('preserveAspectRatio')).toBe('xMidYMid meet');
   });
 });

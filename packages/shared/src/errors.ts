@@ -24,4 +24,14 @@ export interface ApiError {
   code: ErrorCode;
   message: string;
   requestId?: string;
+  /** Machine-readable context, e.g. the allowed values for VALIDATION_FAILED (UC-03 E1). */
+  details?: ApiErrorDetails;
+}
+
+export interface ApiErrorDetails {
+  /** Request field that failed validation. */
+  field?: string;
+  /** Values that would have been accepted for that field. */
+  allowed?: readonly unknown[];
+  [key: string]: unknown;
 }

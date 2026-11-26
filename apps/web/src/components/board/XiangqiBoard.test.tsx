@@ -26,12 +26,12 @@ describe('XiangqiBoard', () => {
   it('renders all 32 pieces in standard starting position', () => {
     render(<XiangqiBoard />);
 
-    const pieces = screen.getAllByRole('button', { name: /(Đỏ|Đen).+tại cột/i });
+    const pieces = screen.getAllByRole('img', { name: /(Đỏ|Đen).+tại cột/i });
     expect(pieces.length).toBe(32);
 
     // 16 Red pieces and 16 Black pieces
-    const redPieces = screen.getAllByRole('button', { name: /Đỏ.+tại cột/i });
-    const blackPieces = screen.getAllByRole('button', { name: /Đen.+tại cột/i });
+    const redPieces = screen.getAllByRole('img', { name: /Đỏ.+tại cột/i });
+    const blackPieces = screen.getAllByRole('img', { name: /Đen.+tại cột/i });
     expect(redPieces.length).toBe(16);
     expect(blackPieces.length).toBe(16);
   });
@@ -128,5 +128,33 @@ describe('XiangqiBoard', () => {
       const mappedBack = screenToSquare(screenCoords.screenCol, screenCoords.screenRow, 'BLACK');
       expect(mappedBack).toEqual(redCorner);
     });
+  });
+
+  it('makes pieces buttons only when the board is interactive', () => {
+    render(<XiangqiBoard onSquareClick={() => {}} />);
+
+    expect(screen.getAllByRole('button', { name: /(Đỏ|Đen).+tại cột/i })).toHaveLength(32);
+  });
+
+  it('gives each board its own gradient ids', () => {
+    const { container } = render(
+      <>
+        <XiangqiBoard />
+        <XiangqiBoard orientation="BLACK" />
+      </>,
+    );
+
+    const ids = [...container.querySelectorAll('linearGradient, radialGradient')].map((g) => g.id);
+    expect(ids).toHaveLength(4);
+    expect(new Set(ids).size).toBe(4);
+    for (const svg of container.querySelectorAll('svg.xiangqi-board-svg')) {
+      const own = [...svg.querySelectorAll('radialGradient')].map((g) => g.id);
+      const used = new Set(
+        [...svg.querySelectorAll('.board-piece-token circle[fill^="url("]')].map((c) =>
+          c.getAttribute('fill'),
+        ),
+      );
+      expect([...used]).toEqual([`url(#${own[0]})`]);
+    }
   });
 });

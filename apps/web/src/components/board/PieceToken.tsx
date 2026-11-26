@@ -10,6 +10,8 @@ export interface PieceTokenProps {
   isLastMove?: boolean;
   onClick?: () => void;
   ariaLabel?: string;
+  /** id of the board's piece gradient; unique per board (see XiangqiBoard). */
+  gradientId?: string;
 }
 
 /** Traditional Xiangqi characters for Red and Black pieces */
@@ -69,6 +71,7 @@ export function PieceToken({
   isLastMove = false,
   onClick,
   ariaLabel,
+  gradientId = 'piece-wood-gradient',
 }: PieceTokenProps): ReactElement {
   const isRed = piece.side === 'RED';
   const char = PIECE_CHARACTERS[piece.side][piece.type];
@@ -86,17 +89,22 @@ export function PieceToken({
         isLastMove ? 'is-last-move' : ''
       }`}
       transform={`translate(${cx}, ${cy})`}
-      role="button"
-      tabIndex={onClick ? 0 : -1}
+      // Only a clickable piece is a button; otherwise it is a labelled image.
+      role={onClick ? 'button' : 'img'}
+      tabIndex={onClick ? 0 : undefined}
       aria-label={label}
-      aria-pressed={selected}
+      aria-pressed={onClick ? selected : undefined}
       onClick={onClick}
-      onKeyDown={(e) => {
-        if (onClick && (e.key === 'Enter' || e.key === ' ')) {
-          e.preventDefault();
-          onClick();
-        }
-      }}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
       style={{ cursor: onClick ? 'pointer' : 'default' } as CSSProperties}
     >
       {/* Outer subtle shadow */}
@@ -107,7 +115,7 @@ export function PieceToken({
         cx="0"
         cy="0"
         r={radius}
-        fill="url(#piece-wood-gradient)"
+        fill={`url(#${gradientId})`}
         stroke={strokeColor}
         strokeWidth="1.6"
       />

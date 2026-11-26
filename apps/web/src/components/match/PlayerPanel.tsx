@@ -71,7 +71,7 @@ export function PlayerPanel({
 
             {isCurrentTurn && (
               <Badge
-                variant={isSelf ? 'danger' : 'neutral'}
+                variant={isSelf ? 'success' : 'neutral'}
                 icon="●"
                 className="player-turn-badge player-turn-desktop"
               >
