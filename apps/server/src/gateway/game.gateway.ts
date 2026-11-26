@@ -17,6 +17,8 @@ import {
   type CloseRoomRequest,
   type CreateRoomRequest,
   type GuestSessionView,
+  type JoinRoomRequest,
+  type MatchStartedPayload,
   type PingResult,
   type RequestEnvelope,
   type RoomView,
@@ -67,6 +69,23 @@ export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
 
   handleConnection(client: Socket): void {
     this.logger.log(`socket connected id=${client.id}`);
+    const guestId = client.data.guestId as string | undefined;
+    if (guestId) {
+      client.on('disconnecting', () => {
+        for (const name of client.rooms) {
+          if (!name.startsWith('room:')) continue;
+          const roomId = name.slice('room:'.length);
+          setImmediate(() => {
+            void this.rooms
+              .disconnect(roomId, guestId, () => this.hasRoomSocket(name, guestId))
+              .then((room) => {
+                if (room) this.queueRoomEvents(room);
+              })
+              .catch(() => this.logger.warn(`Room disconnect update failed roomId=${roomId}`));
+          });
+        }
+      });
+    }
   }
 
   handleDisconnect(client: Socket): void {
@@ -99,11 +118,21 @@ export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     return runHandler(payload, async () => {
       const guest = await this.authenticateGuest(client);
       const room = await this.rooms.close(guest.guestId, payload?.roomId);
-      setImmediate(() => {
-        void this.publishRoomUpdate(room).catch(() => {
-          this.logger.warn(`RoomUpdated delivery failed roomId=${room.roomId}`);
-        });
-      });
+      this.queueRoomEvents(room);
+      return room;
+    });
+  }
+
+  @SubscribeMessage(ClientEvent.JoinRoom)
+  joinRoom(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: JoinRoomRequest | undefined,
+  ): Promise<Ack<RoomView>> {
+    return runHandler(payload, async () => {
+      const guest = await this.authenticateGuest(client);
+      const { room, changed, started } = await this.rooms.join(guest.guestId, payload);
+      await client.join(socketRoomName(room.roomId));
+      if (changed) this.queueRoomEvents(room, started);
       return room;
     });
   }
@@ -122,5 +151,25 @@ export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
         room.seats.find((seat) => seat.guestId === socket.data.guestId)?.side ?? null;
       socket.emit(ServerEvent.RoomUpdated, { ...room, yourSide });
     }
+  }
+
+  private queueRoomEvents(room: RoomView, started?: MatchStartedPayload): void {
+    // Nest sends the returned acknowledgement before the next turn of the event loop.
+    setImmediate(() => {
+      void this.publishRoomUpdate(room)
+        .then(() => {
+          if (started)
+            this.server.to(socketRoomName(room.roomId)).emit(ServerEvent.MatchStarted, started);
+        })
+        .catch(() => this.logger.warn(`Room event delivery failed roomId=${room.roomId}`));
+    });
+  }
+
+  private hasRoomSocket(name: string, guestId: string): boolean {
+    const namespace = this.server.sockets;
+    for (const socketId of namespace.adapter.rooms.get(name) ?? []) {
+      if (namespace.sockets.get(socketId)?.data.guestId === guestId) return true;
+    }
+    return false;
   }
 }
