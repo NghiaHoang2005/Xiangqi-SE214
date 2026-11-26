@@ -1,5 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
-import { ErrorCode } from '@xiangqi/shared';
+import { ErrorCode, type ApiErrorDetails } from '@xiangqi/shared';
 
 const DEFAULT_STATUS: Partial<Record<ErrorCode, HttpStatus>> = {
   ROOM_NOT_FOUND: HttpStatus.NOT_FOUND,
@@ -27,6 +27,8 @@ export class DomainException extends Error {
     readonly code: ErrorCode,
     message: string = code,
     status?: HttpStatus,
+    /** Sent to the client as ApiError.details, e.g. { field, allowed } for VALIDATION_FAILED. */
+    readonly details?: ApiErrorDetails,
   ) {
     super(message);
     this.name = 'DomainException';

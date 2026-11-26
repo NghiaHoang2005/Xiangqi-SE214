@@ -7,7 +7,9 @@ const logger = new Logger('Errors');
 /** Maps any thrown value to an HTTP status and an ApiError; never leaks internal details. */
 export function toApiError(err: unknown, requestId: string): { status: number; body: ApiError } {
   if (err instanceof DomainException) {
-    return { status: err.status, body: { code: err.code, message: err.message, requestId } };
+    const body: ApiError = { code: err.code, message: err.message, requestId };
+    if (err.details) body.details = err.details;
+    return { status: err.status, body };
   }
   if (err instanceof HttpException) {
     const status = err.getStatus();
