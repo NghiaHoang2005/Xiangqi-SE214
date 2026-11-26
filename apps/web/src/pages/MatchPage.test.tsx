@@ -86,4 +86,26 @@ describe('MatchPage', () => {
 
     expect(screen.getByRole('img', { name: 'Đang kết nối lại' })).toBeTruthy();
   });
+
+  it('renders the starting position and flips the board with the panels', () => {
+    const { container } = renderMatch();
+
+    const board = () => container.querySelector('.xiangqi-board-container');
+    expect(board()?.getAttribute('data-orientation')).toBe('RED');
+    expect(screen.getAllByRole('button', { name: /(Đỏ|Đen).+tại cột/ })).toHaveLength(32);
+
+    fireEvent.click(screen.getAllByRole('button', { name: /Đảo góc nhìn bàn cờ/ })[0]!);
+    expect(board()?.getAttribute('data-orientation')).toBe('BLACK');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Đảo góc nhìn' }));
+    expect(board()?.getAttribute('data-orientation')).toBe('RED');
+  });
+
+  it('scales the board SVG instead of overflowing on narrow screens (NFR-04)', () => {
+    const { container } = renderMatch();
+
+    const svg = container.querySelector('.xiangqi-board-svg');
+    expect(svg?.getAttribute('viewBox')).toBe('0 0 360 400');
+    expect(svg?.getAttribute('preserveAspectRatio')).toBe('xMidYMid meet');
+  });
 });
