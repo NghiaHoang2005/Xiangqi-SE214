@@ -36,6 +36,7 @@ function renderAt(path: string) {
 describe('router', () => {
   it.each([
     [paths.home, 'Cờ Tướng Trực Tuyến'],
+    [paths.createRoom, 'Tạo phòng chơi với bạn'],
     [paths.room('abc'), 'Phòng chờ'],
     [paths.aiSetup, 'Chơi với máy'],
     [paths.match('m1'), 'Bàn đấu'],
