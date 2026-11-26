@@ -1,11 +1,13 @@
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { SystemEvent, type Ack, type PingResult } from '@xiangqi/shared';
+import { GUEST_SESSION_COOKIE, SystemEvent, type Ack, type PingResult } from '@xiangqi/shared';
+import { createHash } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 import { io, type Socket } from 'socket.io-client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from './app.module';
 import { configureApp } from './bootstrap';
+import { PrismaService } from './database/prisma.service';
 import { TEST_DATABASE_URL, hasTestDb, resetTestDatabase } from './test/test-db';
 
 describe.skipIf(!hasTestDb)('server skeleton (e2e)', () => {
@@ -60,5 +62,84 @@ describe.skipIf(!hasTestDb)('server skeleton (e2e)', () => {
     } finally {
       socket.close();
     }
+  });
+
+  it('creates a guest, reuses its cookie, and keeps the token out of storage and response bodies', async () => {
+    const url = `${baseUrl}/api/guest-session`;
+    const created = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ nickname: '  Kỳ   thủ  ' }),
+    });
+    const session = await created.json();
+    expect(created.status).toBe(201);
+    expect(session).toEqual({
+      guestId: expect.stringMatching(/^[\da-f-]{36}$/),
+      nickname: 'Kỳ thủ',
+      expiresAt: expect.any(String),
+    });
+    const setCookie = created.headers.get('set-cookie') ?? '';
+    expect(setCookie).toMatch(
+      new RegExp(`^${GUEST_SESSION_COOKIE}=[\\w-]{43}; Max-Age=2592000; Path=/`),
+    );
+    expect(setCookie).toContain('HttpOnly; Secure; SameSite=Lax');
+    const cookie = setCookie.split(';')[0];
+    const token = cookie.slice(GUEST_SESSION_COOKIE.length + 1);
+    const db = app.get(PrismaService);
+    const stored = await db.guestSession.findUniqueOrThrow({ where: { guestId: session.guestId } });
+    expect(stored.reconnectTokenHash).toBe(createHash('sha256').update(token).digest('hex'));
+
+    const reused = await fetch(url, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ nickname: 'Ignored on reuse' }),
+    });
+    expect(reused.status).toBe(200);
+    expect(await reused.json()).toMatchObject({ guestId: session.guestId, nickname: 'Kỳ thủ' });
+
+    const updated = await fetch(`${url}/me`, {
+      method: 'PATCH',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ nickname: 'Người chơi' }),
+    });
+    expect(updated.status).toBe(200);
+    expect(await updated.json()).toMatchObject({
+      guestId: session.guestId,
+      nickname: 'Người chơi',
+    });
+
+    const current = await fetch(`${url}/me`, { headers: { cookie } });
+    expect(current.status).toBe(200);
+    expect(await current.json()).toMatchObject({
+      guestId: session.guestId,
+      nickname: 'Người chơi',
+    });
+
+    await db.guestSession.update({
+      where: { guestId: session.guestId },
+      data: { expiresAt: new Date(0) },
+    });
+    const expired = await fetch(`${url}/me`, { headers: { cookie } });
+    expect(expired.status).toBe(401);
+    expect(await expired.json()).toMatchObject({ code: 'ACCESS_DENIED' });
+    const replacement = await fetch(url, { method: 'POST', headers: { cookie } });
+    expect(replacement.status).toBe(201);
+    expect((await replacement.json()).guestId).not.toBe(session.guestId);
+  });
+
+  it('rejects an invalid nickname and missing guest credentials', async () => {
+    const invalid = await fetch(`${baseUrl}/api/guest-session`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ nickname: 'A' }),
+    });
+    expect(invalid.status).toBe(400);
+    expect(await invalid.json()).toMatchObject({
+      code: 'VALIDATION_FAILED',
+      details: { field: 'nickname' },
+    });
+    const missing = await fetch(`${baseUrl}/api/guest-session/me`);
+    expect(missing.status).toBe(401);
+    expect(await missing.json()).toMatchObject({ code: 'ACCESS_DENIED' });
   });
 });
