@@ -1,46 +1,64 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import type { ConnectionState, Side } from '@xiangqi/shared';
+import type { ConnectionState, Side, TimeControl } from '@xiangqi/shared';
 import { Button } from '../components/ui';
 import { PlayerPanel, type CapturedPiece } from '../components/match/PlayerPanel';
 import { TurnStatusBar } from '../components/match/TurnStatusBar';
 
-interface SeatInfo {
+interface SeatView {
   name: string;
-  elo: number;
   side: Side;
   connectionState: ConnectionState;
-  clockText: string;
-  statsText: string;
+  clockMs: number;
   capturedPieces: CapturedPiece[];
 }
 
-const DEFAULT_RED: SeatInfo = {
-  name: 'Bạn',
-  elo: 1200,
-  side: 'RED',
-  connectionState: 'CONNECTED',
-  clockText: '09:18',
-  statsText: 'Thắng 74% • Cấp 3',
-  capturedPieces: [
-    { label: '馬', side: 'BLACK' },
-    { label: '卒', side: 'BLACK' },
-  ],
-};
+interface MatchView {
+  /** The side of the guest looking at this screen; decides "you" vs "opponent". */
+  mySide: Side;
+  timeControl: TimeControl;
+  turn: Side;
+  seats: Record<Side, SeatView>;
+  moveCount: number;
+}
 
-const DEFAULT_BLACK: SeatInfo = {
-  name: 'Trần Minh Quân',
-  elo: 1245,
-  side: 'BLACK',
-  connectionState: 'CONNECTED',
-  clockText: '08:45',
-  statsText: 'Thắng 68% • Cấp 4',
-  capturedPieces: [
-    { label: '兵', side: 'RED' },
-    { label: '兵', side: 'RED' },
-    { label: '傌', side: 'RED' },
-  ],
-};
+/**
+ * Start-of-game preview shown until the match state is wired in (MatchStarted / sync).
+ * Only values a real match would have at move 0: no Elo, stats or captures yet.
+ */
+function previewMatch(): MatchView {
+  const timeControl: TimeControl = { initialMinutes: 10, incrementSeconds: 5 };
+  const clockMs = timeControl.initialMinutes * 60_000;
+  const seat = (side: Side, name: string): SeatView => ({
+    name,
+    side,
+    connectionState: 'CONNECTED',
+    clockMs,
+    capturedPieces: [],
+  });
+  return {
+    mySide: 'RED',
+    timeControl,
+    turn: 'RED',
+    seats: { RED: seat('RED', 'Bạn'), BLACK: seat('BLACK', 'Kỳ thủ Đen') },
+    moveCount: 0,
+  };
+}
+
+const otherSide = (side: Side): Side => (side === 'RED' ? 'BLACK' : 'RED');
+
+function formatClock(ms: number): string {
+  const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+function timeControlText({ initialMinutes, incrementSeconds }: TimeControl): string {
+  return incrementSeconds > 0
+    ? `${initialMinutes} phút + ${incrementSeconds} giây mỗi nước`
+    : `${initialMinutes} phút, không cộng giờ`;
+}
 
 /** Static 9×10 board frame placeholder until US-16 board renderer is wired in. */
 function BoardFrame({ bottomSide }: { bottomSide: Side }) {
@@ -50,9 +68,10 @@ function BoardFrame({ bottomSide }: { bottomSide: Side }) {
   return (
     <div
       className="match-board-frame"
+      role="img"
       aria-label={`Bàn cờ tướng 9×10 (góc nhìn phe ${bottomSide === 'RED' ? 'Đỏ' : 'Đen'})`}
     >
-      <svg viewBox="0 0 360 400" className="match-board-svg" role="img" aria-hidden="true">
+      <svg viewBox="0 0 360 400" className="match-board-svg" aria-hidden="true">
         <rect x="0" y="0" width="360" height="400" rx="8" fill="#e6cfa8" />
         <rect x="16" y="16" width="328" height="368" fill="none" stroke="#5c4028" strokeWidth="2" />
 
@@ -113,15 +132,26 @@ function BoardFrame({ bottomSide }: { bottomSide: Side }) {
  * Match screen — US-16 / SCRUM-152 (Panel thông tin lượt/đối thủ).
  */
 export function MatchPage() {
-  const { matchId = 'M-9821' } = useParams();
-  const [bottomSide, setBottomSide] = useState<Side>('RED');
-  const [currentTurn, setCurrentTurn] = useState<Side>('RED');
+  const { matchId = '' } = useParams();
+  const [match] = useState(previewMatch);
+  const [bottomSide, setBottomSide] = useState<Side>(match.mySide);
+  const [currentTurn, setCurrentTurn] = useState<Side>(match.turn);
 
-  const topSeat = bottomSide === 'RED' ? DEFAULT_BLACK : DEFAULT_RED;
-  const bottomSeat = bottomSide === 'RED' ? DEFAULT_RED : DEFAULT_BLACK;
-
-  const isTopSelf = topSeat.side === 'RED';
-  const isBottomSelf = bottomSeat.side === 'RED';
+  const flipBoard = () => setBottomSide(otherSide);
+  const renderSeat = (side: Side) => {
+    const seat = match.seats[side];
+    return (
+      <PlayerPanel
+        name={seat.name}
+        side={seat.side}
+        isSelf={seat.side === match.mySide}
+        isCurrentTurn={currentTurn === seat.side}
+        connectionState={seat.connectionState}
+        clockText={formatClock(seat.clockMs)}
+        capturedPieces={seat.capturedPieces}
+      />
+    );
+  };
 
   return (
     <div className="match-page">
@@ -129,38 +159,17 @@ export function MatchPage() {
       <h1 className="sr-only">Bàn đấu</h1>
 
       <TurnStatusBar
-        matchCode={matchId}
+        matchCode={matchId.slice(0, 8)}
+        modeLabel="Phòng riêng"
         currentTurn={currentTurn}
-        onFlipBoard={() => setBottomSide((s) => (s === 'RED' ? 'BLACK' : 'RED'))}
+        onFlipBoard={flipBoard}
       />
 
       <div className="match-layout">
         <div className="match-board-card">
-          <PlayerPanel
-            name={topSeat.name}
-            elo={topSeat.elo}
-            side={topSeat.side}
-            isSelf={isTopSelf}
-            isCurrentTurn={currentTurn === topSeat.side}
-            connectionState={topSeat.connectionState}
-            clockText={topSeat.clockText}
-            statsText={topSeat.statsText}
-            capturedPieces={topSeat.capturedPieces}
-          />
-
+          {renderSeat(otherSide(bottomSide))}
           <BoardFrame bottomSide={bottomSide} />
-
-          <PlayerPanel
-            name={bottomSeat.name}
-            elo={bottomSeat.elo}
-            side={bottomSeat.side}
-            isSelf={isBottomSelf}
-            isCurrentTurn={currentTurn === bottomSeat.side}
-            connectionState={bottomSeat.connectionState}
-            clockText={bottomSeat.clockText}
-            statsText={bottomSeat.statsText}
-            capturedPieces={bottomSeat.capturedPieces}
-          />
+          {renderSeat(bottomSide)}
         </div>
 
         <aside className="match-sidebar" aria-label="Thông tin ván đấu">
@@ -169,64 +178,58 @@ export function MatchPage() {
               <span className="match-side-kicker">THÔNG SỐ TRẬN ĐẤU</span>
               <span className="match-side-tag">Bàn cờ 9 × 10</span>
             </div>
-            <p className="match-side-desc">Cờ chớp: 10 phút + 5 giây (Fischer)</p>
+            <p className="match-side-desc">Đồng hồ: {timeControlText(match.timeControl)}</p>
             <div className="match-side-meta">
               <span>
                 Lượt hiện tại: <strong>{currentTurn === 'RED' ? 'Phe Đỏ' : 'Phe Đen'}</strong>
               </span>
-              <button
-                type="button"
-                className="match-demo-turn-btn"
-                onClick={() => setCurrentTurn((t) => (t === 'RED' ? 'BLACK' : 'RED'))}
-              >
-                Đổi lượt (demo)
-              </button>
+              {import.meta.env.DEV && (
+                <button
+                  type="button"
+                  className="match-demo-turn-btn"
+                  onClick={() => setCurrentTurn(otherSide)}
+                >
+                  Đổi lượt (demo)
+                </button>
+              )}
             </div>
           </section>
 
           <section className="match-side-card">
             <div className="match-side-head">
               <h2 className="match-side-title">Biên Bản Ván Đấu</h2>
-              <span className="match-side-tag">3 Nước Đi</span>
+              <span className="match-side-tag">{match.moveCount} nước đi</span>
             </div>
-            <p className="muted match-side-empty">Chưa có nước đi mới trong phiên này.</p>
+            {match.moveCount === 0 && (
+              <p className="muted match-side-empty">Chưa có nước đi nào.</p>
+            )}
           </section>
 
+          {/* Draw offer and resign arrive with US-21/US-22; disabled until then. */}
           <div className="match-actions-row">
-            <Button variant="secondary" size="md" className="match-action-btn">
-              Cầu Hòa
+            <Button variant="secondary" size="md" className="match-action-btn" disabled>
+              Cầu hòa
             </Button>
-            <Button variant="danger" size="md" className="match-action-btn">
-              Đầu Hàng
+            <Button variant="danger" size="md" className="match-action-btn" disabled>
+              Đầu hàng
             </Button>
           </div>
 
-          <button
-            type="button"
-            className="match-flip-link"
-            onClick={() => setBottomSide((s) => (s === 'RED' ? 'BLACK' : 'RED'))}
-          >
-            ⇅ Đảo Góc Nhìn Bàn Cờ
+          <button type="button" className="match-flip-link" onClick={flipBoard}>
+            ⇅ Đảo góc nhìn bàn cờ
           </button>
         </aside>
       </div>
 
       {/* Mobile compact bottom action bar matching Figma Mobile 04. Match */}
-      <div className="match-mobile-actions" aria-label="Thao tác trận đấu">
-        <button type="button" className="match-mob-btn">
+      <div className="match-mobile-actions" role="group" aria-label="Thao tác trận đấu">
+        <button type="button" className="match-mob-btn" disabled>
           Cầu hòa
         </button>
-        <button type="button" className="match-mob-btn is-danger">
-          Xin thua
+        <button type="button" className="match-mob-btn is-danger" disabled>
+          Đầu hàng
         </button>
-        <button type="button" className="match-mob-btn">
-          Trò chuyện
-        </button>
-        <button
-          type="button"
-          className="match-mob-btn"
-          onClick={() => setBottomSide((s) => (s === 'RED' ? 'BLACK' : 'RED'))}
-        >
+        <button type="button" className="match-mob-btn" onClick={flipBoard}>
           Đảo góc nhìn
         </button>
       </div>

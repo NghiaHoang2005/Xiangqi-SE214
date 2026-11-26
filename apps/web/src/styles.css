@@ -927,9 +927,7 @@ a:focus-visible {
 }
 
 .turn-back-btn,
-.turn-mob-icon,
 .turn-mob-conn-dot,
-.turn-mob-avatar,
 .turn-room-prefix-hidden {
   display: none;
 }
@@ -1011,24 +1009,6 @@ a:focus-visible {
 
 .turn-flip-btn:hover {
   background: #e9e9e3;
-}
-
-.turn-latency-pill {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--ok);
-  background: #e6f4ea;
-  padding: 3px 10px;
-  border-radius: var(--radius-pill);
-}
-
-.turn-fairplay-text {
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.turn-fairplay-text strong {
-  color: var(--ok);
 }
 
 .turn-mobile-label {
@@ -1389,8 +1369,6 @@ a:focus-visible {
   .turn-mode-title,
   .turn-bar-sep,
   .turn-room-prefix,
-  .turn-latency-pill,
-  .turn-fairplay-text,
   .turn-live-prefix,
   .turn-desktop-label,
   .player-role,
@@ -1401,9 +1379,7 @@ a:focus-visible {
     display: none;
   }
   .turn-back-btn,
-  .turn-mob-icon,
-  .turn-mob-conn-dot,
-  .turn-mob-avatar {
+  .turn-mob-conn-dot {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1415,23 +1391,22 @@ a:focus-visible {
     font-weight: 600;
     padding: 2px 4px;
   }
-  .turn-mob-icon {
-    font-size: 14px;
-    color: var(--muted);
-  }
   .turn-mob-conn-dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
+    background: var(--muted);
+  }
+  /* Colour is backed by the aria-label / title text (NFR-16). */
+  .turn-mob-conn-dot.is-connected {
     background: #16a34a;
   }
-  .turn-mob-avatar {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: var(--accent);
-    color: #fff;
-    font-size: 13px;
+  .turn-mob-conn-dot.is-connecting,
+  .turn-mob-conn-dot.is-reconnecting {
+    background: #d97706;
+  }
+  .turn-mob-conn-dot.is-disconnected {
+    background: var(--danger);
   }
   .turn-mobile-label,
   .player-elo-inline {
@@ -1492,7 +1467,7 @@ a:focus-visible {
   }
   .match-mobile-actions {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 6px;
   }
   .match-mob-btn {
@@ -1505,6 +1480,10 @@ a:focus-visible {
     font-weight: 600;
     color: var(--fg);
     cursor: pointer;
+  }
+  .match-mob-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
   }
   .match-mob-btn.is-danger {
     background: var(--danger-bg);
