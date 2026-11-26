@@ -1,5 +1,5 @@
 import { ErrorCode, type RoomView } from '@xiangqi/shared';
-import { ApiRequestError } from '../lib/errors';
+import { ApiRequestError, type ClientError } from '../lib/errors';
 import { paths } from '../routes';
 
 export interface JoinFailure {
@@ -9,7 +9,10 @@ export interface JoinFailure {
 }
 
 export function joinFailure(err: unknown): JoinFailure {
-  const code = err instanceof ApiRequestError ? err.error.code : null;
+  return failureFor(err instanceof ApiRequestError ? err.error.code : null);
+}
+
+export function failureFor(code: ClientError['code'] | null): JoinFailure {
   switch (code) {
     case ErrorCode.ROOM_NOT_FOUND:
       return {
