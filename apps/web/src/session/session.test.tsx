@@ -86,6 +86,34 @@ describe('expired session (UC-01 trigger, UC-02 E1)', () => {
     expect(connect).toHaveBeenCalledTimes(2);
   });
 
+  it('retries only after the new socket connection is up', async () => {
+    const storage = createMemoryStorage();
+    const services = mockServices(storage);
+    setServicesForTests(services);
+    await ensureSession();
+
+    let markConnected: (ok: boolean) => void = () => {};
+    vi.spyOn(services, 'connect').mockReturnValue(
+      new Promise((resolve) => (markConnected = resolve)),
+    );
+    let connected = false;
+    const expired = new ApiRequestError({ code: 'ACCESS_DENIED', message: 'Session expired' });
+    const call = vi
+      .fn()
+      .mockRejectedValueOnce(expired)
+      .mockImplementation(() => Promise.resolve(connected));
+    storage.removeItem('xq.mock.session');
+
+    const result = withSession(call);
+    await waitFor(() => expect(services.connect).toHaveBeenCalledOnce());
+    expect(call).toHaveBeenCalledOnce();
+    connected = true;
+    markConnected(true);
+
+    await expect(result).resolves.toBe(true);
+    expect(call).toHaveBeenCalledTimes(2);
+  });
+
   it('rethrows a real ACCESS_DENIED without a new session or reconnect', async () => {
     const services = mockServices();
     const connect = vi.spyOn(services, 'connect');

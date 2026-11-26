@@ -10,6 +10,7 @@ function toClientError(err: unknown): ClientError {
 }
 
 let inFlight: Promise<boolean> | null = null;
+let connection: Promise<boolean> = Promise.resolve(false);
 
 // Resolves true when the server created a new session (the previous one had expired).
 function bootstrap(showLoading: boolean): Promise<boolean> {
@@ -21,7 +22,7 @@ function bootstrap(showLoading: boolean): Promise<boolean> {
     .then((session) => {
       const hadSession = useSessionStore.getState().session !== null;
       useSessionStore.getState().setSession(session);
-      if (!hadSession || session.isNew) services.connect();
+      if (!hadSession || session.isNew) connection = services.connect();
       return session.isNew;
     })
     .catch((err: unknown) => {
@@ -40,8 +41,11 @@ export async function ensureSession(): Promise<void> {
 }
 
 /** UC-01 re-run after the session expired, without hiding the current screen. */
-export function renewSession(): Promise<boolean> {
-  return bootstrap(false);
+export async function renewSession(): Promise<boolean> {
+  if (!(await bootstrap(false))) return false;
+  // The new session reconnects the socket; a socket call retried before that fails at once.
+  await connection;
+  return true;
 }
 
 /**
@@ -61,7 +65,7 @@ export async function withSession<T>(call: () => Promise<T>): Promise<T> {
 
 /** Retry for "service unavailable": the socket can only connect once a session exists. */
 export function retryConnection(): void {
-  if (useSessionStore.getState().status === 'ready') getServices().connect();
+  if (useSessionStore.getState().status === 'ready') connection = getServices().connect();
   else void ensureSession();
 }
 
@@ -72,5 +76,6 @@ export async function updateNickname(nickname: string): Promise<void> {
 
 export function resetSessionForTests(): void {
   inFlight = null;
+  connection = Promise.resolve(false);
   useSessionStore.setState({ status: 'idle', session: null, error: null });
 }

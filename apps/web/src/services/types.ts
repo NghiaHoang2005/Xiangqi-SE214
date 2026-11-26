@@ -36,6 +36,9 @@ export interface Services {
   readonly kind: 'mock' | 'real';
   session: SessionService;
   room: RoomService;
-  /** Call only after the guest session exists: the socket handshake needs its cookie. */
-  connect(): void;
+  /**
+   * Call only after the guest session exists: the socket handshake needs its cookie.
+   * Resolves true once connected, false on timeout.
+   */
+  connect(): Promise<boolean>;
 }

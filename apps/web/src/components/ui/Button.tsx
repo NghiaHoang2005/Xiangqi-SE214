@@ -1,3 +1,9 @@
+/**
+ * Button component — US-07, SCRUM-129.
+ * Variants: primary | secondary | danger | ghost.
+ * Sizes: sm | md | lg.
+ * Keyboard focus visible (NFR-16).
+ */
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
@@ -6,9 +12,11 @@ export type ButtonSize = 'sm' | 'md' | 'lg';
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   size?: ButtonSize;
-  /** Also disables the button. */
+  /** Shows a spinner and disables the button while true. */
   loading?: boolean;
+  /** Icon placed before the label. */
   startIcon?: ReactNode;
+  /** Icon placed after the label. */
   endIcon?: ReactNode;
 }
 

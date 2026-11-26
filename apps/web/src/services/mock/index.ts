@@ -44,6 +44,9 @@ export function createMockServices(opts: MockOptions = {}): Services {
     kind: 'mock',
     session,
     room,
-    connect: () => useConnectionStore.getState().setStatus('connected'),
+    connect: () => {
+      useConnectionStore.getState().setStatus('connected');
+      return Promise.resolve(true);
+    },
   };
 }
