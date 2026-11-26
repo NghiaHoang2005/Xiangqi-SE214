@@ -1,10 +1,28 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { RouterProvider, createMemoryRouter } from 'react-router-dom';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { routerOptions, routes } from './router';
 import { paths } from './routes';
+import { setServicesForTests, type Services } from './services';
+import { resetSessionForTests } from './session/bootstrap';
 
-afterEach(cleanup);
+// AppLayout creates the guest session on mount; keep it pending so nothing connects.
+const pendingServices: Services = {
+  kind: 'mock',
+  session: { bootstrap: () => new Promise(() => {}), setNickname: () => new Promise(() => {}) },
+  room: {} as Services['room'],
+  connect: () => Promise.resolve(false),
+};
+
+beforeEach(() => {
+  resetSessionForTests();
+  setServicesForTests(pendingServices);
+});
+
+afterEach(() => {
+  cleanup();
+  setServicesForTests(null);
+});
 
 function renderAt(path: string) {
   render(

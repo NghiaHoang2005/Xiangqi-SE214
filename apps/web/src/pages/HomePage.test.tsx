@@ -2,15 +2,12 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useConnectionStore } from '../stores/connection';
+import { useSessionStore } from '../stores/session';
 import { HomePage } from './HomePage';
 
 /* ── Mocks ──────────────────────────────────────────────── */
 
-// Mock socket module so we can spy on connectSocket
-vi.mock('../lib/socket', () => ({
-  connectSocket: vi.fn(),
-  getSocket: vi.fn(() => ({ connected: false })),
-}));
+vi.mock('../session/bootstrap', () => ({ retryConnection: vi.fn() }));
 
 // Mock useNavigate to avoid AbortSignal issues in jsdom + Node 26
 const mockNavigate = vi.fn();
@@ -22,7 +19,7 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
-import { connectSocket } from '../lib/socket';
+import { retryConnection } from '../session/bootstrap';
 
 afterEach(cleanup);
 
@@ -44,6 +41,7 @@ describe('HomePage', () => {
   beforeEach(() => {
     // Start each test with a connected state (default happy path)
     setStatus('connected');
+    useSessionStore.setState({ status: 'ready' });
     vi.clearAllMocks();
   });
 
@@ -170,11 +168,18 @@ describe('HomePage', () => {
     expect(aiBtn.disabled).toBe(true);
   });
 
-  it('calls connectSocket when retry button is clicked', () => {
+  it('calls retryConnection when retry button is clicked', () => {
     setStatus('disconnected');
     renderHome();
     fireEvent.click(screen.getByText('Thử lại'));
-    expect(connectSocket).toHaveBeenCalledTimes(1);
+    expect(retryConnection).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables mode cards until the guest session is ready (UC-01 step 5)', () => {
+    useSessionStore.setState({ status: 'loading' });
+    renderHome();
+    const friendBtn = screen.getByText('Chơi với bạn').closest('button') as HTMLButtonElement;
+    expect(friendBtn.disabled).toBe(true);
   });
 
   it('does not show banner when connected', () => {
