@@ -1518,6 +1518,8 @@ a:focus-visible {
     color: var(--danger);
     border-color: rgba(186, 26, 26, 0.25);
   }
+}
+
 /* ─── Create room (SCRUM-144) ──────────────────────────── */
 .create-room {
   display: flex;
