@@ -6,14 +6,7 @@ import { PlaceholderPage } from './PlaceholderPage';
 
 export { HomePage } from './HomePage';
 export { CreateRoomPage } from './CreateRoomPage';
-
-export const RoomPage = () => (
-  <PlaceholderPage
-    title="Phòng chờ"
-    description="Link và mã phòng, hai ghế Đỏ/Đen, cấu hình đồng hồ."
-    story="US-15"
-  />
-);
+export { RoomPage } from './RoomPage';
 
 export const AiSetupPage = () => (
   <PlaceholderPage

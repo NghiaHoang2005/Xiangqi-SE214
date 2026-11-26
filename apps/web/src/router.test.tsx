@@ -10,7 +10,10 @@ import { resetSessionForTests } from './session/bootstrap';
 const pendingServices: Services = {
   kind: 'mock',
   session: { bootstrap: () => new Promise(() => {}), setNickname: () => new Promise(() => {}) },
-  room: {} as Services['room'],
+  room: {
+    onRoomUpdated: () => () => {},
+    onMatchStarted: () => () => {},
+  } as unknown as Services['room'],
   connect: () => Promise.resolve(false),
 };
 

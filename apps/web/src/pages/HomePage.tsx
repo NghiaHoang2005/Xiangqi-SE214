@@ -1,21 +1,13 @@
+import { isValidJoinCode, JOIN_CODE_LENGTH, normalizeJoinCode } from '@xiangqi/shared';
 import { type FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Badge, Input } from '../components/ui';
 import { paths } from '../routes';
-import { retryConnection } from '../session/bootstrap';
+import { joinFailure, pathAfterJoin } from '../room/join';
+import { getServices } from '../services';
+import { retryConnection, withSession } from '../session/bootstrap';
 import { useConnectionStore } from '../stores/connection';
 import { useSessionStore } from '../stores/session';
-
-/**
- * Room code format: 8 uppercase alphanumeric characters.
- * This mirrors the server's joinCode column (Prisma schema).
- */
-const ROOM_CODE_RE = /^[A-Z0-9]{8}$/;
-
-/** Normalises user input so we accept lowercase and strips whitespace. */
-function normaliseCode(raw: string): string {
-  return raw.replace(/\s+/g, '').toUpperCase();
-}
 
 export function HomePage() {
   const status = useConnectionStore((s) => s.status);
@@ -30,24 +22,30 @@ export function HomePage() {
   // UC-01 step 5: modes open only once the guest session is ready.
   const isOffline = status !== 'connected' || !sessionReady;
 
-  /* ── Room-code form ────────────────────────────────────── */
-  function handleJoin(e: FormEvent) {
+  // UC-04: the code is resolved here, so a wrong code is reported next to the field.
+  async function handleJoin(e: FormEvent) {
     e.preventDefault();
-    const code = normaliseCode(roomCode);
+    if (joining) return;
+    const code = normalizeJoinCode(roomCode);
 
     if (code.length === 0) {
       setCodeError('Vui lòng nhập mã phòng.');
       return;
     }
-    if (!ROOM_CODE_RE.test(code)) {
-      setCodeError('Mã phòng gồm 8 ký tự chữ hoặc số.');
+    if (!isValidJoinCode(code)) {
+      setCodeError(`Mã phòng gồm ${JOIN_CODE_LENGTH} ký tự chữ hoặc số.`);
       return;
     }
 
     setCodeError('');
     setJoining(true);
-    // Navigate straight to the room page; RoomPage will emit JoinRoom.
-    navigate(paths.room(code));
+    try {
+      const room = await withSession(() => getServices().room.joinRoom({ joinCode: code }));
+      navigate(pathAfterJoin(room), { state: { room } });
+    } catch (err) {
+      setCodeError(joinFailure(err).message);
+      setJoining(false);
+    }
   }
 
   return (
