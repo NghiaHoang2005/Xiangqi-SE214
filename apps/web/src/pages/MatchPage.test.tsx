@@ -108,4 +108,47 @@ describe('MatchPage', () => {
     expect(svg?.getAttribute('viewBox')).toBe('0 0 360 400');
     expect(svg?.getAttribute('preserveAspectRatio')).toBe('xMidYMid meet');
   });
+
+  it('selects own piece on own turn, shows Rules Engine legal moves, and forbids enemy/off-turn selection (FR-08)', () => {
+    const { container } = renderMatch();
+    const boardContainer = () => container.querySelector('.xiangqi-board-container');
+
+    // 1. Clicking Black General on Red turn does nothing
+    fireEvent.click(screen.getByRole('button', { name: /Tướng Đen tại cột 5, hàng 10/ }));
+    expect(boardContainer()?.getAttribute('data-legal-count')).toBe('0');
+    expect(container.querySelector('.board-piece-token.is-selected')).toBeNull();
+
+    // 2. Clicking Red Cannon at (1, 2) selects it and highlights 12 legal moves (11 quiet + 1 capture)
+    const redCannon = screen.getByRole('button', { name: /Pháo Đỏ tại cột 2, hàng 3/ });
+    fireEvent.click(redCannon);
+
+    expect(redCannon.getAttribute('aria-pressed')).toBe('true');
+    expect(boardContainer()?.getAttribute('data-legal-count')).toBe('12');
+    expect(container.querySelectorAll('.legal-move-indicator')).toHaveLength(11);
+    expect(container.querySelectorAll('.legal-capture-ring')).toHaveLength(1);
+    expect(
+      screen.getByRole('button', { name: /Mã Đen tại cột 2, hàng 10, có thể ăn/ }),
+    ).toBeTruthy();
+
+    // 3. Clicking another Red piece switches selection to Horse at (1, 0) -> 2 legal moves
+    fireEvent.click(screen.getByRole('button', { name: /Mã Đỏ tại cột 2, hàng 1/ }));
+    expect(boardContainer()?.getAttribute('data-legal-count')).toBe('2');
+    expect(screen.getByTestId('square-0-2').getAttribute('data-legal-move')).toBe('move');
+    expect(screen.getByTestId('square-2-2').getAttribute('data-legal-move')).toBe('move');
+
+    // 4. Clicking selected Horse again deselects it
+    fireEvent.click(screen.getByRole('button', { name: /Mã Đỏ tại cột 2, hàng 1/ }));
+    expect(boardContainer()?.getAttribute('data-legal-count')).toBe('0');
+
+    // 5. Re-select Red piece, then switch turn to Black -> selection clears and Red piece cannot be selected
+    fireEvent.click(screen.getByRole('button', { name: /Mã Đỏ tại cột 2, hàng 1/ }));
+    expect(boardContainer()?.getAttribute('data-legal-count')).toBe('2');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Đổi lượt (demo)' }));
+    expect(boardContainer()?.getAttribute('data-legal-count')).toBe('0');
+
+    fireEvent.click(screen.getByRole('button', { name: /Mã Đỏ tại cột 2, hàng 1/ }));
+    expect(boardContainer()?.getAttribute('data-legal-count')).toBe('0');
+    expect(container.querySelector('.board-piece-token.is-selected')).toBeNull();
+  });
 });

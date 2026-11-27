@@ -8,6 +8,7 @@ export interface PieceTokenProps {
   radius?: number;
   selected?: boolean;
   isLastMove?: boolean;
+  isCaptureTarget?: boolean;
   onClick?: () => void;
   ariaLabel?: string;
   /** id of the board's piece gradient; unique per board (see XiangqiBoard). */
@@ -69,6 +70,7 @@ export function PieceToken({
   radius = 16,
   selected = false,
   isLastMove = false,
+  isCaptureTarget = false,
   onClick,
   ariaLabel,
   gradientId = 'piece-wood-gradient',
@@ -87,7 +89,7 @@ export function PieceToken({
     <g
       className={`board-piece-token ${isRed ? 'is-red' : 'is-black'} ${selected ? 'is-selected' : ''} ${
         isLastMove ? 'is-last-move' : ''
-      }`}
+      } ${isCaptureTarget ? 'is-capture-target' : ''}`}
       transform={`translate(${cx}, ${cy})`}
       // Only a clickable piece is a button; otherwise it is a labelled image.
       role={onClick ? 'button' : 'img'}

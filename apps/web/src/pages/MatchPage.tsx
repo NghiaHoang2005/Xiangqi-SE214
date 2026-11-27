@@ -1,7 +1,12 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { createInitialPosition, type Board } from '@xiangqi/rules';
 import type { ConnectionState, Side, Square, TimeControl } from '@xiangqi/shared';
-import { XiangqiBoard } from '../components/board';
+import {
+  getLegalMovesForSelection,
+  resolvePieceSelection,
+  XiangqiBoard,
+} from '../components/board';
 import { Button } from '../components/ui';
 import { PlayerPanel, type CapturedPiece } from '../components/match/PlayerPanel';
 import { TurnStatusBar } from '../components/match/TurnStatusBar';
@@ -68,9 +73,35 @@ function timeControlText({ initialMinutes, incrementSeconds }: TimeControl): str
 export function MatchPage() {
   const { matchId = '' } = useParams();
   const [match] = useState(previewMatch);
+  const [board] = useState<Board>(() => createInitialPosition().board);
   const [bottomSide, setBottomSide] = useState<Side>(match.mySide);
   const [currentTurn, setCurrentTurn] = useState<Side>(match.turn);
   const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
+
+  const effectiveSelectedSquare = currentTurn === match.mySide ? selectedSquare : null;
+
+  const legalMoves = useMemo(
+    () =>
+      getLegalMovesForSelection({
+        board,
+        turn: currentTurn,
+        mySide: match.mySide,
+        selectedSquare: effectiveSelectedSquare,
+      }),
+    [board, currentTurn, match.mySide, effectiveSelectedSquare],
+  );
+
+  const handleSquareClick = (sq: Square) => {
+    setSelectedSquare((prev) =>
+      resolvePieceSelection({
+        board,
+        turn: currentTurn,
+        mySide: match.mySide,
+        selectedSquare: prev,
+        clickedSquare: sq,
+      }),
+    );
+  };
 
   const flipBoard = () => setBottomSide(otherSide);
   const renderSeat = (side: Side) => {
@@ -104,14 +135,12 @@ export function MatchPage() {
         <div className="match-board-card">
           {renderSeat(otherSide(bottomSide))}
           <XiangqiBoard
+            board={board}
             orientation={bottomSide}
             turn={currentTurn}
-            selectedSquare={selectedSquare}
-            onSquareClick={(sq) =>
-              setSelectedSquare((prev) =>
-                prev?.file === sq.file && prev?.rank === sq.rank ? null : sq,
-              )
-            }
+            selectedSquare={effectiveSelectedSquare}
+            legalMoves={legalMoves}
+            onSquareClick={handleSquareClick}
           />
           {renderSeat(bottomSide)}
         </div>
@@ -131,7 +160,10 @@ export function MatchPage() {
                 <button
                   type="button"
                   className="match-demo-turn-btn"
-                  onClick={() => setCurrentTurn(otherSide)}
+                  onClick={() => {
+                    setCurrentTurn(otherSide);
+                    setSelectedSquare(null);
+                  }}
                 >
                   Đổi lượt (demo)
                 </button>
