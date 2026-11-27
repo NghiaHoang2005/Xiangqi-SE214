@@ -1,37 +1,14 @@
-import {
-  ErrorCode,
-  TIME_CONTROL_PRESETS,
-  type SidePreference,
-  type TimeControl,
-} from '@xiangqi/shared';
+import { ErrorCode, TIME_CONTROL_PRESETS, type SidePreference } from '@xiangqi/shared';
 import { type FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui';
 import { ApiRequestError } from '../lib/errors';
 import { paths } from '../routes';
+import { CLOCK_NAMES, clockHint, timeControlKey } from '../room/timeControl';
 import { getServices } from '../services';
 import { withSession } from '../session/bootstrap';
 import { useConnectionStore } from '../stores/connection';
 import { useSessionStore } from '../stores/session';
-
-const timeControlKey = (tc: TimeControl) => `${tc.initialMinutes}+${tc.incrementSeconds}`;
-
-const CLOCK_NAMES: Record<string, string> = {
-  '5+0': 'Chớp chớp',
-  '5+5': 'Chớp tích lũy',
-  '10+0': 'Nhanh',
-  '10+5': 'Nhanh chuẩn (Khuyên dùng)',
-  '15+0': 'Tiêu chuẩn',
-  '15+5': 'Tiêu chuẩn tích lũy',
-};
-
-function clockHint(tc: TimeControl): string {
-  const bonus =
-    tc.incrementSeconds > 0
-      ? `cộng thêm ${tc.incrementSeconds} giây sau mỗi nước đi hợp lệ`
-      : 'không cộng thêm thời gian sau mỗi nước đi';
-  return `Mỗi bên có ${tc.initialMinutes} phút suy nghĩ chính, ${bonus}.`;
-}
 
 const SIDE_OPTIONS: { value: SidePreference; label: string; hint: string }[] = [
   { value: 'RED', label: 'Đỏ', hint: 'Đi trước' },

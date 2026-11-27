@@ -1,7 +1,7 @@
 import { ErrorCode, type RoomView } from '@xiangqi/shared';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { Button } from '../components/ui';
+import { Button, useOptionalToast } from '../components/ui';
 import { failureFor, joinFailure, type JoinFailure } from '../room/join';
 import { paths } from '../routes';
 import { getServices } from '../services';
@@ -25,6 +25,7 @@ export function RoomPage() {
   const { roomId = '' } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const toast = useOptionalToast();
   const sessionReady = useSessionStore((s) => s.status === 'ready');
   const connected = useConnectionStore((s) => s.status === 'connected');
 
@@ -33,6 +34,9 @@ export function RoomPage() {
     failure: null,
   }));
   const [attempt, setAttempt] = useState(0);
+  const [closing, setClosing] = useState(false);
+  const [closeError, setCloseError] = useState('');
+  const closingSelfRef = useRef(false);
 
   // Re-runs after a reconnect too: JoinRoom is idempotent for a seated guest, and it
   // reattaches the new socket to the room.
@@ -57,6 +61,7 @@ export function RoomPage() {
     const rooms = getServices().room;
     const offUpdated = rooms.onRoomUpdated(roomId, (room) => {
       if (room.status === 'CLOSED' || room.status === 'EXPIRED') {
+        if (closingSelfRef.current) return;
         setState({ room: null, failure: failureFor(ErrorCode.ROOM_EXPIRED) });
       } else {
         setState((s) => (s.failure ? s : { room, failure: null }));
@@ -76,6 +81,22 @@ export function RoomPage() {
     setAttempt((n) => n + 1);
   }
 
+  async function handleCloseRoom() {
+    if (closing || !state.room) return;
+    setClosing(true);
+    setCloseError('');
+    closingSelfRef.current = true;
+    try {
+      await withSession(() => getServices().room.closeRoom(state.room!.roomId));
+      toast?.show({ title: 'Đã đóng phòng', message: 'Phòng chờ đã được đóng.', variant: 'info' });
+      navigate(paths.home, { replace: true });
+    } catch (err: unknown) {
+      closingSelfRef.current = false;
+      setCloseError(joinFailure(err).message);
+      setClosing(false);
+    }
+  }
+
   if (state.failure) {
     return (
       <section className="page room-join">
@@ -91,7 +112,16 @@ export function RoomPage() {
     );
   }
 
-  if (state.room) return <WaitingRoom room={state.room} />;
+  if (state.room) {
+    return (
+      <WaitingRoom
+        room={state.room}
+        onCloseRoom={handleCloseRoom}
+        closing={closing}
+        closeError={closeError}
+      />
+    );
+  }
 
   return (
     <section className="page room-join" aria-busy="true">

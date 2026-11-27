@@ -162,6 +162,25 @@ describe('RoomPage', () => {
     );
   });
 
+  it('lets the host close the room from the waiting screen and invalidates later joins', async () => {
+    const { host, room } = await hostRoom();
+    await actAs(host);
+    renderRoom(room.roomId);
+    await screen.findByText(room.joinCode);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Đóng phòng' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Xác nhận đóng phòng' }));
+
+    expect(await screen.findByRole('heading', { name: 'Trang chủ' })).toBeTruthy();
+
+    cleanup();
+    await actAs(await newGuest());
+    renderRoom(room.roomId);
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Phòng đã hết hạn hoặc đã bị chủ phòng đóng.',
+    );
+  });
+
   it('retries after a network error', async () => {
     const { room } = await hostRoom();
     const guest = await newGuest();
