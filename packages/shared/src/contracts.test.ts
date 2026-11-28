@@ -9,6 +9,7 @@ import {
   JOIN_CODE_LENGTH,
   normalizeJoinCode,
 } from './room';
+import { isMoveRejection, MOVE_REJECTION_CODES, type MatchSnapshot } from './match';
 
 describe('nickname', () => {
   it('trims, collapses whitespace and treats empty as no nickname', () => {
@@ -60,5 +61,32 @@ describe('event names', () => {
   it('include the room lifecycle events', () => {
     expect(ClientEvent.CloseRoom).toBe('CloseRoom');
     expect(ServerEvent.RoomUpdated).toBe('RoomUpdated');
+  });
+});
+
+describe('isMoveRejection', () => {
+  const snapshot: MatchSnapshot = {
+    matchId: 'm',
+    version: 3,
+    status: 'IN_PROGRESS',
+    turn: 'BLACK',
+    fen: 'fen',
+    stateHash: 'hash',
+    checkState: 'NONE',
+    lastMove: null,
+    clocks: { redMs: 1, blackMs: 2 },
+    serverTime: '2026-11-28T00:00:00.000Z',
+  };
+
+  it('accepts a rejection code that carries a snapshot', () => {
+    for (const code of MOVE_REJECTION_CODES)
+      expect(isMoveRejection({ code, message: '', details: { moveId: 'x', snapshot } })).toBe(true);
+  });
+
+  it('rejects other codes and rejections without a snapshot', () => {
+    expect(isMoveRejection({ code: 'ACCESS_DENIED', message: '', details: { snapshot } })).toBe(
+      false,
+    );
+    expect(isMoveRejection({ code: 'STALE_STATE', message: '' })).toBe(false);
   });
 });
