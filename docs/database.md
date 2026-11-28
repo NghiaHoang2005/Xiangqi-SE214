@@ -79,6 +79,9 @@ erDiagram
     jsonb capture
     jsonb clock_after
     char state_hash
+    int version "match version after the move"
+    text fen "board after the move"
+    check_state check_state
   }
 ```
 
@@ -90,6 +93,7 @@ erDiagram
 | One guest cannot take both seats            | unique `(room_id, guest_id)`                                  | FR-04 |
 | A ply is committed once per match           | PK `(match_id, ply)`                                          | 8.3   |
 | A retried `SubmitMove` cannot commit twice  | unique `(match_id, move_id)`                                  | 3.3   |
+| A retried `SubmitMove` gets the first Ack   | `move` keeps `version`, `fen`, `check_state` of the commit    | 3.3   |
 | PVE matches name the AI side and difficulty | check `chk_match_pve_has_ai` (added by hand in the migration) | FR-30 |
 | Deleting a match deletes its moves          | FK `ON DELETE CASCADE`                                        | BR-20 |
 

@@ -79,6 +79,16 @@ enum EndReason {
   @@map("end_reason")
 }
 
+/// Check state of the side to move after a committed move (same values as @xiangqi/shared CheckState).
+enum CheckState {
+  NONE
+  CHECK
+  CHECKMATE
+  STALEMATE
+
+  @@map("check_state")
+}
+
 enum ActorType {
   HUMAN
   AI
@@ -188,22 +198,27 @@ model Match {
 /// (match, ply) is the key, so plies cannot repeat; (match, moveId) is unique, so a client
 /// retry with the same moveId cannot commit twice (SRS 3.3).
 model Move {
-  matchId    String    @map("match_id") @db.Uuid
+  matchId    String     @map("match_id") @db.Uuid
   ply        Int
   /// Client-generated idempotency key (AI moves get a server-generated one).
-  moveId     String    @map("move_id") @db.Uuid
-  actorType  ActorType @map("actor_type")
+  moveId     String     @map("move_id") @db.Uuid
+  actorType  ActorType  @map("actor_type")
   /// Null for AI moves.
-  guestId    String?   @map("guest_id") @db.Uuid
+  guestId    String?    @map("guest_id") @db.Uuid
   /// { file, rank }, same shape as @xiangqi/rules Square.
-  fromSquare Json      @map("from_square")
-  toSquare   Json      @map("to_square")
+  fromSquare Json       @map("from_square")
+  toSquare   Json       @map("to_square")
   /// Captured piece, if any (BR-10).
   capture    Json?
-  clockAfter Json      @map("clock_after")
+  clockAfter Json       @map("clock_after")
   /// Hash of the board after the move, used to check both clients converge (NFR-06).
-  stateHash  String    @map("state_hash") @db.Char(64)
-  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  stateHash  String     @map("state_hash") @db.Char(64)
+  /// Match version after this move, FEN of the board after it and the check state of the side to
+  /// move: with the columns above they rebuild the Ack of a retried SubmitMove (UC-06 E3).
+  version    Int
+  fen        String
+  checkState CheckState @map("check_state")
+  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
 
   match Match @relation(fields: [matchId], references: [matchId], onDelete: Cascade)
 

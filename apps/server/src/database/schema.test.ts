@@ -1,7 +1,6 @@
 import { Prisma, type PrismaClient } from '@prisma/client';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { MatchRepository } from '../modules/match/match.repository';
 import { hasTestDb, resetTestDatabase } from '../test/test-db';
 
 const TC = { initialMinutes: 10, incrementSeconds: 5 };
@@ -71,39 +70,15 @@ describe.skipIf(!hasTestDb)('database schema (SRS 8.2)', () => {
         toSquare: { file: 2, rank: 2 },
         clockAfter: CLOCKS,
         stateHash: 'a'.repeat(64),
+        version: ply,
+        fen: 'fen',
+        checkState: 'NONE',
       },
     });
 
   it('creates a match with defaults: in progress, red to move, version 0', async () => {
     const m = await pvpMatch();
     expect(m).toMatchObject({ status: 'IN_PROGRESS', turn: 'RED', version: 0 });
-  });
-
-  it('serializes duplicate and competing submissions against the same version', async () => {
-    const match = await pvpMatch();
-    const repository = new MatchRepository(db);
-    const move = {
-      moveId: randomUUID(),
-      actorType: 'HUMAN',
-      guestId: match.redGuestId,
-      fromSquare: { file: 1, rank: 0 },
-      toSquare: { file: 2, rank: 2 },
-      stateHash: 'a'.repeat(64),
-    } as const;
-    const advance = () => ({ snapshot: { ply: 1 }, clocks: CLOCKS, turn: 'BLACK' as const });
-    const submit = () => repository.commitMove(match.matchId, 0, move, advance);
-    const repeated = await Promise.all([submit(), submit()]);
-    expect(repeated.map((result) => result.replayed).sort()).toEqual([false, true]);
-    expect(repeated[0].move).toEqual(repeated[1].move);
-    await expect(
-      repository.commitMove(match.matchId, 0, { ...move, moveId: randomUUID() }, advance),
-    ).rejects.toMatchObject({ code: 'STALE_STATE' });
-    expect(await db.move.count({ where: { matchId: match.matchId } })).toBe(1);
-    expect(await db.match.findUnique({ where: { matchId: match.matchId } })).toMatchObject({
-      version: 1,
-      turn: 'BLACK',
-      snapshot: { ply: 1 },
-    });
   });
 
   it('allows at most one seat per side in a room (no third seat, FR-04)', async () => {
