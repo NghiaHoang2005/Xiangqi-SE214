@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { createInitialPosition, type Board } from '@xiangqi/rules';
+import { createInitialPosition, type Position } from '@xiangqi/rules';
 import type { ConnectionState, Side, Square, TimeControl } from '@xiangqi/shared';
 import {
   getLegalMovesForSelection,
   resolvePieceSelection,
   XiangqiBoard,
 } from '../components/board';
+import { isSideToMoveInCheck, tryLocalMove } from '../match/clientRules';
 import { Button } from '../components/ui';
 import { PlayerPanel, type CapturedPiece } from '../components/match/PlayerPanel';
 import { TurnStatusBar } from '../components/match/TurnStatusBar';
@@ -73,10 +74,13 @@ function timeControlText({ initialMinutes, incrementSeconds }: TimeControl): str
 export function MatchPage() {
   const { matchId = '' } = useParams();
   const [match] = useState(previewMatch);
-  const [board] = useState<Board>(() => createInitialPosition().board);
+  const [position, setPosition] = useState<Position>(createInitialPosition);
+  const [lastMove, setLastMove] = useState<{ from: Square; to: Square } | null>(null);
+  const [moveCount, setMoveCount] = useState(match.moveCount);
   const [bottomSide, setBottomSide] = useState<Side>(match.mySide);
-  const [currentTurn, setCurrentTurn] = useState<Side>(match.turn);
   const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
+  const { board, turn: currentTurn } = position;
+  const inCheck = useMemo(() => isSideToMoveInCheck(position), [position]);
 
   const effectiveSelectedSquare = currentTurn === match.mySide ? selectedSquare : null;
 
@@ -91,7 +95,18 @@ export function MatchPage() {
     [board, currentTurn, match.mySide, effectiveSelectedSquare],
   );
 
+  // Until SubmitMove is wired (US-20), the move is only applied locally.
   const handleSquareClick = (sq: Square) => {
+    const move = effectiveSelectedSquare
+      ? tryLocalMove(position, match.mySide, effectiveSelectedSquare, sq)
+      : null;
+    if (move) {
+      setPosition(move.position);
+      setLastMove({ from: move.from, to: move.to });
+      setMoveCount((n) => n + 1);
+      setSelectedSquare(null);
+      return;
+    }
     setSelectedSquare((prev) =>
       resolvePieceSelection({
         board,
@@ -140,6 +155,7 @@ export function MatchPage() {
             turn={currentTurn}
             selectedSquare={effectiveSelectedSquare}
             legalMoves={legalMoves}
+            lastMove={lastMove}
             onSquareClick={handleSquareClick}
           />
           {renderSeat(bottomSide)}
@@ -156,12 +172,17 @@ export function MatchPage() {
               <span>
                 Lượt hiện tại: <strong>{currentTurn === 'RED' ? 'Phe Đỏ' : 'Phe Đen'}</strong>
               </span>
+              <span role="status" aria-live="polite">
+                {inCheck && (
+                  <strong>{currentTurn === 'RED' ? 'Phe Đỏ' : 'Phe Đen'} đang bị chiếu</strong>
+                )}
+              </span>
               {import.meta.env.DEV && (
                 <button
                   type="button"
                   className="match-demo-turn-btn"
                   onClick={() => {
-                    setCurrentTurn(otherSide);
+                    setPosition((p) => ({ ...p, turn: otherSide(p.turn) }));
                     setSelectedSquare(null);
                   }}
                 >
@@ -174,11 +195,9 @@ export function MatchPage() {
           <section className="match-side-card">
             <div className="match-side-head">
               <h2 className="match-side-title">Biên Bản Ván Đấu</h2>
-              <span className="match-side-tag">{match.moveCount} nước đi</span>
+              <span className="match-side-tag">{moveCount} nước đi</span>
             </div>
-            {match.moveCount === 0 && (
-              <p className="muted match-side-empty">Chưa có nước đi nào.</p>
-            )}
+            {moveCount === 0 && <p className="muted match-side-empty">Chưa có nước đi nào.</p>}
           </section>
 
           {/* Draw offer and resign arrive with US-21/US-22; disabled until then. */}

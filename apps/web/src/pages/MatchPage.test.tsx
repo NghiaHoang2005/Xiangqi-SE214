@@ -151,4 +151,29 @@ describe('MatchPage', () => {
     expect(boardContainer()?.getAttribute('data-legal-count')).toBe('0');
     expect(container.querySelector('.board-piece-token.is-selected')).toBeNull();
   });
+
+  it('plays a legal move through the Rules Engine and passes the turn', () => {
+    const { container } = renderMatch();
+    const boardContainer = () => container.querySelector('.xiangqi-board-container');
+
+    fireEvent.click(screen.getByRole('button', { name: /Pháo Đỏ tại cột 2, hàng 3/ }));
+    fireEvent.click(screen.getByTestId('square-4-2'));
+
+    expect(screen.getByRole('button', { name: /Pháo Đỏ tại cột 5, hàng 3/ })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Pháo Đỏ tại cột 2, hàng 3/ })).toBeNull();
+    expect(screen.getByText('1 nước đi')).toBeTruthy();
+    expect(boardContainer()?.getAttribute('data-legal-count')).toBe('0');
+
+    const [top] = panels(container);
+    expect(top!.dataset.active).toBe('true');
+  });
+
+  it('captures with a legal move', () => {
+    renderMatch();
+
+    fireEvent.click(screen.getByRole('button', { name: /Pháo Đỏ tại cột 2, hàng 3/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Mã Đen tại cột 2, hàng 10, có thể ăn/ }));
+
+    expect(screen.getAllByRole('button', { name: /(Đỏ|Đen).+tại cột/ })).toHaveLength(31);
+  });
 });
