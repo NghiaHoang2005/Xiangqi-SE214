@@ -39,12 +39,17 @@ export interface ClientEventContracts {
   CreateRoom: { request: import('./room').CreateRoomRequest; ack: import('./room').RoomView };
   JoinRoom: { request: import('./room').JoinRoomRequest; ack: import('./room').RoomView };
   CloseRoom: { request: import('./room').CloseRoomRequest; ack: import('./room').RoomView };
+  SubmitMove: {
+    request: import('./match').SubmitMoveRequest;
+    ack: import('./match').MoveAcceptedPayload;
+  };
 }
 
 /** Payload per server → client event, for the events whose contract is agreed. */
 export interface ServerEventPayloads {
   RoomUpdated: import('./room').RoomUpdatedPayload;
   MatchStarted: import('./room').MatchStartedPayload;
+  MoveAccepted: import('./match').MoveAcceptedPayload;
 }
 
 /** Socket.IO acknowledgement returned by every client → server event handler. */

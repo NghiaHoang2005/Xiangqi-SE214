@@ -1,7 +1,8 @@
-# API contract: guest session, rooms, match start
+# API contract: guest session, rooms, match start, moves
 
-Covers US-11 (SCRUM-72), US-13 (SCRUM-74) and US-14 (SCRUM-75).
-The types live in `packages/shared` (`guest-session.ts`, `room.ts`, `events.ts`, `errors.ts`);
+Covers US-11 (SCRUM-72), US-13 (SCRUM-74), US-14 (SCRUM-75) and the moves of US-20..22
+(SCRUM-81..83).
+The types live in `packages/shared` (`guest-session.ts`, `room.ts`, `match.ts`, `events.ts`, `errors.ts`);
 this page explains them. **If this page and the types disagree, the types win**: change the
 types first, then this page.
 
@@ -90,6 +91,46 @@ separately rather than broadcasting one object.
 `@xiangqi/rules`), `clocks`, and `players.RED` and `players.BLACK` (`{ guestId, nickname }`).
 The client finds its side by comparing its `guestId` with `players`, uses it for the board
 orientation, then navigates to `/match/:matchId`.
+
+## 6. Moves (US-20..22) — socket `SubmitMove`
+
+Request `SubmitMoveRequest = { matchId, moveId, version, from, to }` → Ack `MoveAcceptedPayload`.
+
+- `moveId` is a UUID v4 made by the client per move. Resending the same `moveId` (after a
+  timeout or reconnect) returns the Ack of the first commit and broadcasts nothing (UC-06 E3).
+- `version` is the match version the client saw. The server compares it inside the locked
+  transaction (`MatchRepository.commitMove`).
+- The Ack is sent only after the move, match snapshot and clocks are committed (NFR-07). A
+  failed commit answers `INTERNAL_ERROR` and nothing is broadcast (E4).
+
+On success the server also emits `MoveAccepted` (same payload) to the Socket.IO room
+`match:<matchId>`, the mover included. Clients apply a payload only if its `version` is
+greater than theirs, so the Ack and the event can arrive in either order. A payload with a
+gap (`version > current + 1`) is still safe to apply: `fen` is the whole board.
+
+`MoveAcceptedPayload`: `matchId, moveId, ply, version, actorType, side, from, to, capture,
+turn, checkState, fen, stateHash, clocks { redMs, blackMs }, committedAt`.
+`checkState` is `NONE | CHECK | CHECKMATE | STALEMATE` for the side to move; a game-ending
+move is followed by `GameEnded`. Clients check `stateHash` against `stateHash(parseFen(fen))`
+to prove both boards converged (NFR-06).
+
+### Rejection
+
+A rejected move is the failed Ack. The SRS 9.3 `MoveRejected` fields travel in it, so no
+separate `MoveRejected` event is emitted:
+
+| `error.code`                  | When                                                         | `error.details`        |
+| ----------------------------- | ------------------------------------------------------------ | ---------------------- |
+| `MOVE_ILLEGAL`                | Breaks a rule or leaves own General in check                 | `{ moveId, snapshot }` |
+| `NOT_YOUR_TURN`               | Not the sender's turn                                        | `{ moveId, snapshot }` |
+| `STALE_STATE`                 | `version` is not the current version                         | `{ moveId, snapshot }` |
+| `GAME_FINISHED`               | Match finished, also a move after the clock deadline (FR-18) | `{ moveId, snapshot }` |
+| `VALIDATION_FAILED`           | Malformed body or square off the board                       | `{ field }`            |
+| `ACCESS_DENIED` / `NOT_FOUND` | Sender has no seat / unknown match                           | none (no state leaks)  |
+
+`isMoveRejection(error)` tells the two groups apart. `snapshot` is a `MatchSnapshot`
+(`matchId, version, status, turn, fen, stateHash, checkState, lastMove, clocks, serverTime`);
+the client replaces its board with it, drops the pending move and keeps its move history (FR-12).
 
 ## Flow
 

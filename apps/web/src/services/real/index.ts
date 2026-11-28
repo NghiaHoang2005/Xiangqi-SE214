@@ -27,7 +27,11 @@ async function request<E extends ContractEvent>(
   throw new ApiRequestError(ack.error);
 }
 
-function onRoomEvent<E extends keyof ServerEventPayloads>(
+type RoomEvent = {
+  [E in keyof ServerEventPayloads]: ServerEventPayloads[E] extends { roomId: string } ? E : never;
+}[keyof ServerEventPayloads];
+
+function onRoomEvent<E extends RoomEvent>(
   event: E,
   roomId: string,
   listener: (payload: ServerEventPayloads[E]) => void,
