@@ -5,6 +5,7 @@ import { clientError, type ClientError } from './errors';
 import { newRequestId } from './request-id';
 
 const ACK_TIMEOUT_MS = 5000;
+const CONNECT_TIMEOUT_MS = 5000;
 
 /** Ack as seen by the client: the server's Ack, or a timeout / not-connected error. */
 export type ClientAck<T> = Ack<T> | { ok: false; requestId: string; error: ClientError };
@@ -33,12 +34,25 @@ export function getSocket(): Socket {
   return socket;
 }
 
-export function connectSocket(): void {
+/** Resolves true once connected, or false if not connected within timeoutMs. */
+export function connectSocket(timeoutMs = CONNECT_TIMEOUT_MS): Promise<boolean> {
   const s = getSocket();
-  if (!s.connected) {
-    useConnectionStore.getState().setStatus('connecting');
-    s.connect();
-  }
+  // The handshake authenticates from the cookie, so a renewed session needs a new handshake.
+  if (s.connected) s.disconnect();
+  useConnectionStore.getState().setStatus('connecting');
+  const connected = new Promise<boolean>((resolve) => {
+    const onConnect = () => {
+      clearTimeout(timer);
+      resolve(true);
+    };
+    const timer = setTimeout(() => {
+      s.off('connect', onConnect);
+      resolve(false);
+    }, timeoutMs);
+    s.once('connect', onConnect);
+  });
+  s.connect();
+  return connected;
 }
 
 /**
