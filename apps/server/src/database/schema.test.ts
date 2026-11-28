@@ -70,6 +70,9 @@ describe.skipIf(!hasTestDb)('database schema (SRS 8.2)', () => {
         toSquare: { file: 2, rank: 2 },
         clockAfter: CLOCKS,
         stateHash: 'a'.repeat(64),
+        version: ply,
+        fen: 'fen',
+        checkState: 'NONE',
       },
     });
 
