@@ -173,6 +173,21 @@ export class RoomService {
     });
   }
 
+  async expireWaitingRooms(now = new Date()): Promise<RoomView[]> {
+    const expired = await this.db.$queryRaw<Array<{ roomId: string }>>`
+      UPDATE room SET status = 'EXPIRED'
+      WHERE status = 'WAITING' AND expires_at <= ${now}
+      RETURNING room_id AS "roomId"
+    `;
+    if (expired.length === 0) return [];
+
+    const rooms = await this.db.room.findMany({
+      where: { roomId: { in: expired.map(({ roomId }) => roomId) } },
+      include: roomRelations,
+    });
+    return rooms.map((room) => toRoomView(room, room.hostGuestId));
+  }
+
   async join(guestId: string, request: JoinRoomRequest | undefined): Promise<JoinResult> {
     const identifier = readRoomIdentifier(request);
     try {
