@@ -72,6 +72,11 @@ export function useToast(): ToastContextValue {
   return ctx;
 }
 
+/** Variant of useToast that returns null when rendered outside <ToastProvider>. */
+export function useOptionalToast(): ToastContextValue | null {
+  return useContext(ToastContext);
+}
+
 /* ── Icons — text, not colour alone (NFR-16) ── */
 const ICONS: Record<ToastVariant, string> = {
   info: 'ℹ',

@@ -5,14 +5,8 @@ import { PlaceholderPage } from './PlaceholderPage';
 // UI text is Vietnamese (FR-25). Each placeholder names the story that replaces it.
 
 export { HomePage } from './HomePage';
-
-export const RoomPage = () => (
-  <PlaceholderPage
-    title="Phòng chờ"
-    description="Link và mã phòng, hai ghế Đỏ/Đen, cấu hình đồng hồ."
-    story="US-15"
-  />
-);
+export { CreateRoomPage } from './CreateRoomPage';
+export { RoomPage } from './RoomPage';
 
 export const AiSetupPage = () => (
   <PlaceholderPage
@@ -22,13 +16,7 @@ export const AiSetupPage = () => (
   />
 );
 
-export const MatchPage = () => (
-  <PlaceholderPage
-    title="Bàn đấu"
-    description="Bàn cờ, đồng hồ, lượt đi, cầu hòa và đầu hàng."
-    story="US-16"
-  />
-);
+export { MatchPage } from './MatchPage';
 
 export const HistoryPage = () => (
   <PlaceholderPage

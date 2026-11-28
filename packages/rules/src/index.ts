@@ -14,6 +14,9 @@ export {
 } from '@xiangqi/shared';
 
 export * from './fen';
+export * from './check';
 export * from './initial-position';
+export * from './move-generation';
+export * from './legal-moves';
 export * from './position';
 export * from './state-hash';

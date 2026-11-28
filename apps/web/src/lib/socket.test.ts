@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { useConnectionStore } from '../stores/connection';
-import { emitWithAck, getSocket, resetSocketForTests } from './socket';
+import { connectSocket, emitWithAck, getSocket, resetSocketForTests } from './socket';
 
 afterEach(() => {
   resetSocketForTests();
@@ -19,6 +19,17 @@ describe('socket client', () => {
       requestId: 'req_12345678',
       error: { code: 'NETWORK_ERROR' },
     });
+  });
+
+  it('connectSocket resolves true on connect', async () => {
+    const socket = getSocket();
+    const connected = connectSocket(1000);
+    socket.listeners('connect').forEach((listener) => listener.call(socket));
+    await expect(connected).resolves.toBe(true);
+  });
+
+  it('connectSocket resolves false when the connection does not come up in time', async () => {
+    await expect(connectSocket(10)).resolves.toBe(false);
   });
 
   it('mirrors socket events in the connection store', () => {

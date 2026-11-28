@@ -1,15 +1,23 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { setServicesForTests, type Services } from '../services';
+import {
+  createMemoryBus,
+  createMemoryStorage,
+  createMockServices,
+  MOCK_ERROR_CODES,
+  type MockEvent,
+} from '../services/mock';
 import { useConnectionStore } from '../stores/connection';
+import { useSessionStore } from '../stores/session';
 import { HomePage } from './HomePage';
 
 /* ── Mocks ──────────────────────────────────────────────── */
 
-// Mock socket module so we can spy on connectSocket
-vi.mock('../lib/socket', () => ({
-  connectSocket: vi.fn(),
-  getSocket: vi.fn(() => ({ connected: false })),
+vi.mock('../session/bootstrap', () => ({
+  retryConnection: vi.fn(),
+  withSession: <T,>(call: () => Promise<T>) => call(),
 }));
 
 // Mock useNavigate to avoid AbortSignal issues in jsdom + Node 26
@@ -22,9 +30,24 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
-import { connectSocket } from '../lib/socket';
+import { retryConnection } from '../session/bootstrap';
 
-afterEach(cleanup);
+const sharedStorage = createMemoryStorage();
+const bus = createMemoryBus<MockEvent>();
+
+function guestServices(): Services {
+  return createMockServices({
+    latencyMs: 0,
+    sessionStorage: createMemoryStorage(),
+    sharedStorage,
+    bus,
+  });
+}
+
+afterEach(() => {
+  cleanup();
+  setServicesForTests(null);
+});
 
 /** Render HomePage inside a memory router (for context providers). */
 function renderHome() {
@@ -33,6 +56,12 @@ function renderHome() {
   });
   render(<RouterProvider router={router} future={{ v7_startTransition: true }} />);
   return router;
+}
+
+async function guestServicesSession() {
+  const services = guestServices();
+  await services.session.bootstrap();
+  setServicesForTests(services);
 }
 
 /** Set connection status in the store. */
@@ -44,7 +73,9 @@ describe('HomePage', () => {
   beforeEach(() => {
     // Start each test with a connected state (default happy path)
     setStatus('connected');
+    useSessionStore.setState({ status: 'ready' });
     vi.clearAllMocks();
+    setServicesForTests(guestServices());
   });
 
   /* ── Basic rendering ───────────────────────────────── */
@@ -104,21 +135,43 @@ describe('HomePage', () => {
     expect(screen.getByText('Mã phòng gồm 8 ký tự chữ hoặc số.')).toBeTruthy();
   });
 
-  it('navigates to /room/:code for a valid 8-char code', () => {
-    renderHome();
-    const input = screen.getByLabelText('Vào phòng bằng mã') as HTMLInputElement;
-    fireEvent.change(input, { target: { value: 'abcd1234' } });
+  function submitCode(value: string) {
+    fireEvent.change(screen.getByLabelText('Vào phòng bằng mã'), { target: { value } });
     fireEvent.click(screen.getByRole('button', { name: 'Vào phòng' }));
-    // Input is normalised to uppercase
-    expect(mockNavigate).toHaveBeenCalledWith('/room/ABCD1234');
+  }
+
+  it('joins by a normalised code and goes to the match the second seat starts', async () => {
+    const host = guestServices();
+    await host.session.bootstrap();
+    const created = await host.room.createRoom({
+      timeControl: { initialMinutes: 10, incrementSeconds: 5 },
+      preferredSide: 'RED',
+    });
+    await guestServicesSession();
+
+    renderHome();
+    submitCode(`  ${created.joinCode.slice(0, 4).toLowerCase()}-${created.joinCode.slice(4)} `);
+
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledOnce());
+    const [path, options] = mockNavigate.mock.calls[0];
+    expect(path).toMatch(/^\/match\//);
+    expect(options.state.room).toMatchObject({ roomId: created.roomId, yourSide: 'BLACK' });
   });
 
-  it('normalises pasted room code with leading and trailing whitespace', () => {
+  it.each([
+    ['ABCDEFGH', 'Không tìm thấy phòng. Hãy kiểm tra lại mã hoặc liên kết.'],
+    [MOCK_ERROR_CODES.expired, 'Phòng đã hết hạn hoặc đã bị chủ phòng đóng.'],
+    [MOCK_ERROR_CODES.full, 'Phòng đã đủ hai người chơi.'],
+    [MOCK_ERROR_CODES.network, 'Không kết nối được máy chủ. Vui lòng thử lại.'],
+  ])('shows the join error for %s next to the field', async (code, message) => {
+    await guestServicesSession();
     renderHome();
-    const input = screen.getByLabelText('Vào phòng bằng mã') as HTMLInputElement;
-    fireEvent.change(input, { target: { value: '   abcd1234   ' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Vào phòng' }));
-    expect(mockNavigate).toHaveBeenCalledWith('/room/ABCD1234');
+    submitCode(code);
+
+    expect(await screen.findByText(message)).toBeTruthy();
+    expect(mockNavigate).not.toHaveBeenCalled();
+    const button = screen.getByRole('button', { name: 'Vào phòng' }) as HTMLButtonElement;
+    expect(button.disabled).toBe(false);
   });
 
   it('clears the error when the user starts typing again', () => {
@@ -170,11 +223,18 @@ describe('HomePage', () => {
     expect(aiBtn.disabled).toBe(true);
   });
 
-  it('calls connectSocket when retry button is clicked', () => {
+  it('calls retryConnection when retry button is clicked', () => {
     setStatus('disconnected');
     renderHome();
     fireEvent.click(screen.getByText('Thử lại'));
-    expect(connectSocket).toHaveBeenCalledTimes(1);
+    expect(retryConnection).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables mode cards until the guest session is ready (UC-01 step 5)', () => {
+    useSessionStore.setState({ status: 'loading' });
+    renderHome();
+    const friendBtn = screen.getByText('Chơi với bạn').closest('button') as HTMLButtonElement;
+    expect(friendBtn.disabled).toBe(true);
   });
 
   it('does not show banner when connected', () => {
