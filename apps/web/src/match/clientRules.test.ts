@@ -31,12 +31,11 @@ describe('tryLocalMove', () => {
     expect(tryLocalMove(start, 'RED', { file: 4, rank: 4 }, { file: 4, rank: 5 })).toBeNull();
   });
 
-  it('flags a move that gives check', () => {
+  it('leaves the opponent in check after a checking move', () => {
     const position = parseFen('3k5/9/9/9/9/9/9/9/9/4KR3 w');
 
     const move = tryLocalMove(position, 'RED', { file: 5, rank: 0 }, { file: 5, rank: 9 });
 
-    expect(move!.givesCheck).toBe(true);
     expect(isSideToMoveInCheck(move!.position)).toBe(true);
     expect(isSideToMoveInCheck(position)).toBe(false);
   });
@@ -54,5 +53,17 @@ describe('positionFromServer', () => {
 
   it('reports divergence when the hashes differ', () => {
     expect(positionFromServer({ fen: INITIAL_FEN, stateHash: '0'.repeat(64) }).inSync).toBe(false);
+  });
+
+  it.each([
+    ['a truncated FEN', 'rnbakabnr/9/1c5c1 w'],
+    ['an unknown piece', 'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNZ w'],
+    ['a missing side to move', 'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR'],
+    ['a board without a general', 'rnba1abnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w'],
+  ])('reports divergence instead of throwing for %s', (_, fen) => {
+    expect(positionFromServer({ fen, stateHash: '0'.repeat(64) })).toEqual({
+      position: null,
+      inSync: false,
+    });
   });
 });

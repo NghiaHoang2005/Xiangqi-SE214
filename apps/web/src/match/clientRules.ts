@@ -2,9 +2,11 @@ import {
   generateLegalMoves,
   getPiece,
   isInCheck,
+  InvalidFenError,
   parseFen,
   setPiece,
   stateHash,
+  type Board,
   type Position,
 } from '@xiangqi/rules';
 import type { Piece, Side, Square } from '@xiangqi/shared';
@@ -15,8 +17,6 @@ export interface LocalMove {
   piece: Piece;
   capture: Piece | null;
   position: Position;
-  /** Whether the side now to move is in check. */
-  givesCheck: boolean;
 }
 
 const otherSide = (side: Side): Side => (side === 'RED' ? 'BLACK' : 'RED');
@@ -42,29 +42,36 @@ export function tryLocalMove(
 
   const capture = getPiece(position.board, to);
   const board = setPiece(setPiece(position.board, from, null), to, piece);
-  const turn = otherSide(mySide);
-  return {
-    from,
-    to,
-    piece,
-    capture,
-    position: { board, turn },
-    givesCheck: isInCheck(board, turn),
-  };
+  return { from, to, piece, capture, position: { board, turn: otherSide(mySide) } };
 }
 
 export function isSideToMoveInCheck(position: Position): boolean {
   return isInCheck(position.board, position.turn);
 }
 
-export interface ServerPosition {
-  position: Position;
-  /** False when the local hash of `fen` differs from the server's, i.e. the boards diverged (NFR-06). */
-  inSync: boolean;
-}
+export type ServerPosition =
+  | { position: Position; inSync: boolean }
+  /** The server state could not be read; resync from a snapshot instead (NFR-06). */
+  | { position: null; inSync: false };
 
-/** Rebuilds the board from a MoveAccepted payload or MatchSnapshot. */
+const hasGeneral = (board: Board, side: Side) =>
+  board.some((piece) => piece?.type === 'GENERAL' && piece.side === side);
+
+/**
+ * Rebuilds the board from a MoveAccepted payload or MatchSnapshot. `inSync` is false when the
+ * local hash differs from the server's, i.e. the boards diverged (NFR-06).
+ */
 export function positionFromServer(state: { fen: string; stateHash: string }): ServerPosition {
-  const position = parseFen(state.fen);
+  let position: Position;
+  try {
+    position = parseFen(state.fen);
+  } catch (error) {
+    if (error instanceof InvalidFenError) return { position: null, inSync: false };
+    throw error;
+  }
+  // The check and move helpers throw on a board without both generals.
+  if (!hasGeneral(position.board, 'RED') || !hasGeneral(position.board, 'BLACK')) {
+    return { position: null, inSync: false };
+  }
   return { position, inSync: stateHash(position) === state.stateHash };
 }

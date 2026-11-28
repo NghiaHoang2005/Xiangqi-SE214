@@ -183,6 +183,7 @@ export function MatchPage() {
                   className="match-demo-turn-btn"
                   onClick={() => {
                     setPosition((p) => ({ ...p, turn: otherSide(p.turn) }));
+                    setLastMove(null);
                     setSelectedSquare(null);
                   }}
                 >

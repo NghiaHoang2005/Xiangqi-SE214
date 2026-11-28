@@ -168,6 +168,18 @@ describe('MatchPage', () => {
     expect(top!.dataset.active).toBe('true');
   });
 
+  it('clears the last-move highlight when the demo button switches the turn', () => {
+    const { container } = renderMatch();
+
+    fireEvent.click(screen.getByRole('button', { name: /Pháo Đỏ tại cột 2, hàng 3/ }));
+    fireEvent.click(screen.getByTestId('square-4-2'));
+    expect(container.querySelector('.is-last-move')).not.toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Đổi lượt (demo)' }));
+
+    expect(container.querySelector('.is-last-move')).toBeNull();
+  });
+
   it('captures with a legal move', () => {
     renderMatch();
 
