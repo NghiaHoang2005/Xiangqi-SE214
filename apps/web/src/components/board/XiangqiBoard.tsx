@@ -9,6 +9,7 @@ import {
 } from '@xiangqi/shared';
 import { createInitialPosition, type Board } from '@xiangqi/rules';
 import { PieceToken, PIECE_NAMES_VI } from './PieceToken';
+import { isSameSquare, squareKey } from './selection';
 
 export interface XiangqiBoardProps {
   /** The 90-cell board array. Defaults to initialPosition standard starting position. */
@@ -19,6 +20,8 @@ export interface XiangqiBoardProps {
   turn?: Side;
   /** Currently selected square, if any */
   selectedSquare?: Square | null;
+  /** Legal destination squares for the selected piece (US-19 / SCRUM-157) */
+  legalMoves?: readonly Square[];
   /** Last executed move to highlight */
   lastMove?: { from: Square; to: Square } | null;
   /** Callback when any intersection square is clicked */
@@ -62,12 +65,6 @@ export function screenToSquare(
   const rank = orientation === 'RED' ? BOARD_RANKS - 1 - screenRow : screenRow;
 
   return { file, rank };
-}
-
-/** Check if two squares are identical */
-function isSameSquare(a: Square | null | undefined, b: Square | null | undefined): boolean {
-  if (!a || !b) return false;
-  return a.file === b.file && a.rank === b.rank;
 }
 
 /** Generate SVG path for intersection corner marks (L-marks) */
@@ -132,6 +129,7 @@ export function XiangqiBoard({
   orientation = 'RED',
   turn,
   selectedSquare,
+  legalMoves = [],
   lastMove,
   onSquareClick,
   onPieceClick,
@@ -149,8 +147,70 @@ export function XiangqiBoard({
   const turnText = turn ? `, lượt: Phe ${turn === 'RED' ? 'Đỏ' : 'Đen'}` : '';
   const accessibleBoardLabel = `Bàn cờ tướng 9×10, góc nhìn phe ${orientationText}${turnText}`;
 
-  // Pre-calculate pieces with screen coordinates
+  const legalMoveKeys = new Set(legalMoves.map(squareKey));
+  const selectedPiece = selectedSquare ? board[squareToIndex(selectedSquare)] : null;
+  const selectionAnnouncement =
+    selectedSquare && selectedPiece
+      ? `Đã chọn ${PIECE_NAMES_VI[selectedPiece.side][selectedPiece.type]} tại cột ${
+          selectedSquare.file + 1
+        }, hàng ${selectedSquare.rank + 1}. Có ${legalMoves.length} nước đi hợp lệ.`
+      : '';
+
+  // Pre-calculate pieces and capture rings with screen coordinates
   const pieceNodes: ReactElement[] = [];
+  const quietMoveNodes: ReactElement[] = [];
+  const captureRingNodes: ReactElement[] = [];
+
+  for (const dest of legalMoves) {
+    const targetPiece = board[squareToIndex(dest)];
+    const { cx, cy } = squareToScreen(dest, orientation);
+    const key = squareKey(dest);
+
+    if (targetPiece) {
+      captureRingNodes.push(
+        <g
+          key={`capture-hint-${key}`}
+          className="legal-capture-ring"
+          data-legal-move="capture"
+          data-square={key}
+          pointerEvents="none"
+        >
+          <circle
+            cx={cx}
+            cy={cy}
+            r={18.5}
+            fill="none"
+            stroke="#ffffff"
+            strokeWidth="3.2"
+            strokeOpacity="0.9"
+          />
+          <circle
+            cx={cx}
+            cy={cy}
+            r={18.5}
+            fill="none"
+            stroke="#15803d"
+            strokeWidth="2.2"
+            strokeDasharray="4.5 2.5"
+          />
+        </g>,
+      );
+    } else {
+      quietMoveNodes.push(
+        <g
+          key={`move-hint-${key}`}
+          className="legal-move-indicator"
+          data-legal-move="move"
+          data-square={key}
+          pointerEvents="none"
+        >
+          <circle cx={cx} cy={cy} r={10} fill="rgba(21, 128, 61, 0.16)" />
+          <circle cx={cx} cy={cy} r={5.5} fill="#15803d" stroke="#ffffff" strokeWidth="1.5" />
+        </g>,
+      );
+    }
+  }
+
   for (let rank = 0; rank < BOARD_RANKS; rank++) {
     for (let file = 0; file < BOARD_FILES; file++) {
       const square: Square = { file, rank };
@@ -160,6 +220,7 @@ export function XiangqiBoard({
       if (piece) {
         const { cx, cy } = squareToScreen(square, orientation);
         const isSelected = isSameSquare(selectedSquare, square);
+        const isCaptureTarget = legalMoveKeys.has(squareKey(square));
         const isLastMoveSquare =
           isSameSquare(lastMove?.from, square) || isSameSquare(lastMove?.to, square);
 
@@ -167,6 +228,11 @@ export function XiangqiBoard({
           if (onPieceClick) onPieceClick(piece, square);
           if (onSquareClick) onSquareClick(square);
         };
+
+        const baseLabel = `${PIECE_NAMES_VI[piece.side][piece.type]} tại cột ${
+          file + 1
+        }, hàng ${rank + 1}`;
+        const pieceAriaLabel = isCaptureTarget ? `${baseLabel}, có thể ăn` : baseLabel;
 
         pieceNodes.push(
           <PieceToken
@@ -178,10 +244,9 @@ export function XiangqiBoard({
             gradientId={pieceGradientId}
             selected={isSelected}
             isLastMove={isLastMoveSquare}
+            isCaptureTarget={isCaptureTarget}
             onClick={onPieceClick || onSquareClick ? handlePieceClick : undefined}
-            ariaLabel={`${PIECE_NAMES_VI[piece.side][piece.type]} tại cột ${
-              file + 1
-            }, hàng ${rank + 1}`}
+            ariaLabel={pieceAriaLabel}
           />,
         );
       }
@@ -193,9 +258,15 @@ export function XiangqiBoard({
       id={id}
       className={`xiangqi-board-container ${className}`.trim()}
       data-orientation={orientation}
+      data-legal-count={legalMoves.length}
       aria-label={accessibleBoardLabel}
       role="region"
     >
+      {selectionAnnouncement && (
+        <p className="sr-only" aria-live="polite">
+          {selectionAnnouncement}
+        </p>
+      )}
       <svg
         viewBox={`0 0 ${BOARD_WIDTH} ${BOARD_HEIGHT}`}
         className="xiangqi-board-svg"
@@ -418,6 +489,13 @@ export function XiangqiBoard({
           files.map((screenCol) => {
             const square = screenToSquare(screenCol, screenRow, orientation);
             const { cx, cy } = squareToScreen(square, orientation);
+            const key = squareKey(square);
+            const isLegal = legalMoveKeys.has(key);
+            const legalKind = isLegal
+              ? board[squareToIndex(square)]
+                ? 'capture'
+                : 'move'
+              : undefined;
             return (
               <circle
                 key={`intersect-hit-${screenCol}-${screenRow}`}
@@ -428,13 +506,20 @@ export function XiangqiBoard({
                 style={{ cursor: onSquareClick ? 'pointer' : 'default' } as CSSProperties}
                 onClick={() => onSquareClick?.(square)}
                 data-testid={`square-${square.file}-${square.rank}`}
+                data-legal-move={legalKind}
               />
             );
           }),
         )}
 
+        {/* Legal quiet-move destination dots */}
+        {quietMoveNodes}
+
         {/* 32 Pieces */}
         {pieceNodes}
+
+        {/* Legal capture destination rings */}
+        {captureRingNodes}
       </svg>
     </div>
   );

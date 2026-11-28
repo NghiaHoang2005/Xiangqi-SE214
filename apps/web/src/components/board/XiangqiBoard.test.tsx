@@ -157,4 +157,40 @@ describe('XiangqiBoard', () => {
       expect([...used]).toEqual([`url(#${own[0]})`]);
     }
   });
+
+  it('renders quiet-move dots and capture target rings for legalMoves and flips them with BLACK orientation', () => {
+    const legalMoves = [
+      { file: 1, rank: 3 }, // empty square -> quiet move
+      { file: 1, rank: 9 }, // Black horse -> capture target
+    ];
+
+    const { container, rerender } = render(
+      <XiangqiBoard
+        selectedSquare={{ file: 1, rank: 2 }}
+        legalMoves={legalMoves}
+        orientation="RED"
+      />,
+    );
+
+    const quiet = container.querySelector('.legal-move-indicator[data-square="1-3"]');
+    const capture = container.querySelector('.legal-capture-ring[data-square="1-9"]');
+    expect(quiet).toBeTruthy();
+    expect(capture).toBeTruthy();
+    expect(screen.getByRole('img', { name: /Mã Đen tại cột 2, hàng 10, có thể ăn/ })).toBeTruthy();
+
+    // Check screen coordinates flip under BLACK orientation:
+    // { file: 1, rank: 9 } -> BLACK screenCol = 8 - 1 = 7 (cx = 24 + 7*39 = 297), screenRow = 9 (cy = 24 + 9*39 = 375)
+    rerender(
+      <XiangqiBoard
+        selectedSquare={{ file: 1, rank: 2 }}
+        legalMoves={legalMoves}
+        orientation="BLACK"
+      />,
+    );
+    const flippedCaptureCircle = container.querySelector(
+      '.legal-capture-ring[data-square="1-9"] circle',
+    );
+    expect(flippedCaptureCircle?.getAttribute('cx')).toBe('297');
+    expect(flippedCaptureCircle?.getAttribute('cy')).toBe('375');
+  });
 });

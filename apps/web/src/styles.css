@@ -1300,6 +1300,15 @@ a:focus-visible {
   filter: brightness(1.08);
 }
 
+.board-piece-token.is-capture-target circle:nth-child(2) {
+  filter: brightness(1.05);
+}
+
+.legal-move-indicator,
+.legal-capture-ring {
+  transition: opacity 0.12s ease-out;
+}
+
 .piece-character {
   user-select: none;
   pointer-events: none;
